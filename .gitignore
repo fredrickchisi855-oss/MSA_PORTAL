@@ -34,3 +34,12 @@ android_app/local.properties
 # Android troubleshooting and backup copies
 *.androidx-failed
 *.pdf-fix-backup
+
+# Private school databases - never upload to GitHub
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+backups/

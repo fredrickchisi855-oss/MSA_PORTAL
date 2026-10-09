@@ -995,7 +995,7 @@ function viewResultPDF(resultId) {
         window.AndroidMSA &&
         typeof window.AndroidMSA.viewResult === "function"
     ) {
-        window.AndroidMSA.viewResult(url);
+        window.AndroidMSA.openInChrome(url);
         return;
     }
 
@@ -1136,29 +1136,17 @@ function showStudentWelcome(studentName, afterWelcome) {
    ============================================================ */
 
 window.viewResultPDF = function(resultId) {
-
     const id = Number(resultId);
-
-    console.log("MSA VIEW CLICK:", id);
 
     if (!Number.isInteger(id) || id <= 0) {
         alert("Invalid result.");
         return;
     }
 
-    const url = "/api/results/" + encodeURIComponent(id);
+    const url = "http://127.0.0.1:8081/api/results/" +
+        encodeURIComponent(id);
 
-    console.log("Opening result:", url);
-
-    if (
-        window.AndroidMSA &&
-        typeof window.AndroidMSA.viewResult === "function"
-    ) {
-        window.AndroidMSA.viewResult(url);
-        return;
-    }
-
-    window.open(url, "_blank");
+    window.location.href = url;
 };
 
 
@@ -1503,24 +1491,26 @@ window.refreshResults = async function() {
 
                             <div class="result-download">
                                 <a
-                                    class="download-result-btn"
-                                    href="/api/results/${Number(result.id)}"
-                                    download="${escapeHtml(
-                                        result.file_name ||
-                                        "MSA_PORTAL_Result.pdf"
-                                    )}"
-                                >
+    class="download-result-btn"
+    data-result-id="${Number(result.id)}"
+    data-result-file="${escapeHtml(result.file_name || "MSA_PORTAL_Result.pdf")}"
+    href="/api/results/${Number(result.id)}"
+    download="${escapeHtml(result.file_name || "MSA_PORTAL_Result.pdf")}"
+    onclick="if(window.AndroidMSA && typeof window.AndroidMSA.downloadResult === 'function'){event.preventDefault();event.stopImmediatePropagation();window.AndroidMSA.downloadResult('/api/results/${Number(result.id)}', this.getAttribute('download'));return false;}"
+>
                                     📥 DOWNLOAD PDF
                                 </a>
                             </div>
                         </div>
 
                         <a
-                            class="history-view"
-                            href="/api/results/${Number(result.id)}"
-                            target="_blank"
-                            rel="noopener"
-                        >
+    class="history-view"
+    data-result-id="${Number(result.id)}"
+    href="/api/results/${Number(result.id)}"
+    target="_blank"
+    rel="noopener"
+    onclick="if(window.AndroidMSA && typeof window.AndroidMSA.viewResult === 'function'){event.preventDefault();event.stopImmediatePropagation();window.AndroidMSA.openInChrome('/api/results/${Number(result.id)}');return false;}"
+>
                             👁 VIEW
                         </a>
                     </div>
@@ -1797,10 +1787,13 @@ async function viewResult(name, form) {
 <div class="result-download">
 
     <a
-                                    class="download-result-btn"
-                                    href="/api/results/${Number(result.id)}"
-                                    download="${escapeHtml(result.file_name || "MSA_PORTAL_Result.pdf")}"
-                                >
+    class="download-result-btn"
+    data-result-id="${Number(result.id)}"
+    data-result-file="${escapeHtml(result.file_name || "MSA_PORTAL_Result.pdf")}"
+    href="/api/results/${Number(result.id)}"
+    download="${escapeHtml(result.file_name || "MSA_PORTAL_Result.pdf")}"
+    onclick="if(window.AndroidMSA && typeof window.AndroidMSA.downloadResult === 'function'){event.preventDefault();event.stopImmediatePropagation();window.AndroidMSA.downloadResult('/api/results/${Number(result.id)}', this.getAttribute('download'));return false;}"
+>
         📥 DOWNLOAD PDF
     </a>
 
@@ -1811,11 +1804,13 @@ async function viewResult(name, form) {
 
                         
 <a
-                            class="history-view"
-                            href="/api/results/${Number(result.id)}"
-                            target="_blank"
-                            rel="noopener"
-                        >
+    class="history-view"
+    data-result-id="${Number(result.id)}"
+    href="/api/results/${Number(result.id)}"
+    target="_blank"
+    rel="noopener"
+    onclick="if(window.AndroidMSA && typeof window.AndroidMSA.viewResult === 'function'){event.preventDefault();event.stopImmediatePropagation();window.AndroidMSA.openInChrome('/api/results/${Number(result.id)}');return false;}"
+>
     👁 VIEW
 </a>
 
@@ -1857,8 +1852,7 @@ async function viewResult(name, form) {
         // Results History has now been rendered.
         // Attach VIEW and DOWNLOAD events to the
         // actual buttons that now exist in the DOM.
-
-
+        wireResultButtons();
 
     } catch (error) {
         console.error(error);
