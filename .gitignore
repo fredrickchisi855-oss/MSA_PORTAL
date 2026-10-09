@@ -1,0 +1,36 @@
+# Student records and private data
+backend/*.db
+backend/*.db-*
+backend/*secret*
+backend/*.log
+backend/results/
+
+# Environment and Python files
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Application backups
+*.backup*
+*.before*
+*.syntax_error*
+*results-backup*
+
+# Android build files
+android_app/.gradle/
+android_app/**/build/
+android_app/local.properties
+*.apk
+*.aab
+
+# Local files
+.DS_Store
+*.log
+
+# Android troubleshooting and backup copies
+*.androidx-failed
+*.pdf-fix-backup

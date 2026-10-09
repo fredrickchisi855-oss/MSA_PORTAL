@@ -1,0 +1,4458 @@
+
+
+// ======================================================
+// MSA ADMIN SECURE API
+// ======================================================
+
+const MSA_ADMIN_SECURE_FETCH = true;
+
+(function() {
+
+    const originalFetch =
+        window.fetch.bind(window);
+
+    window.fetch = function(
+        input,
+        options
+    ) {
+
+        options = options || {};
+
+        let url = "";
+
+        if (typeof input === "string") {
+            url = input;
+        } else if (input && input.url) {
+            url = input.url;
+        }
+
+        if (
+            url.indexOf("/api/admin/login") === -1
+        ) {
+
+            const token =
+                localStorage.getItem(
+                    "MSA_ADMIN_TOKEN"
+                );
+
+            if (token) {
+
+                const headers =
+                    new Headers(
+                        options.headers || {}
+                    );
+
+                headers.set(
+                    "Authorization",
+                    "Bearer " + token
+                );
+
+                options.headers = headers;
+            }
+        }
+
+        return originalFetch(
+            input,
+            options
+        ).then(function(response) {
+
+            if (
+                response.status === 401
+                &&
+                url.indexOf(
+                    "/api/admin/login"
+                ) === -1
+            ) {
+
+                localStorage.removeItem(
+                    "MSA_ADMIN_TOKEN"
+                );
+
+                alert(
+                    "Administrator session expired. Please log in again."
+                );
+
+                window.location.reload();
+            }
+
+            return response;
+        });
+    };
+
+})();
+
+const API = "/api";
+
+// ======================================================
+// ======================================================
+// ADMINISTRATOR NAME SEARCH
+// ======================================================
+
+let MSA_ADMIN_LOGIN_USERS = [];
+
+function msaEscapeAdminSearch(value) {
+
+    return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function msaHighlightAdminMatch(text, query) {
+
+    const value = String(text || "");
+    const search = String(query || "").trim();
+
+    if (!search) {
+        return msaEscapeAdminSearch(value);
+    }
+
+    const escaped =
+        search.replace(
+            /[.*+?^${}()|[\]\\]/g,
+            "\\$&"
+        );
+
+    const regex =
+        new RegExp("(" + escaped + ")", "gi");
+
+    let output = "";
+    let lastIndex = 0;
+    let match;
+
+    while ((match = regex.exec(value)) !== null) {
+
+        output += msaEscapeAdminSearch(
+            value.slice(lastIndex, match.index)
+        );
+
+        output +=
+            '<span class="msa-admin-search-highlight">' +
+            msaEscapeAdminSearch(match[0]) +
+            "</span>";
+
+        lastIndex =
+            match.index + match[0].length;
+    }
+
+    output += msaEscapeAdminSearch(
+        value.slice(lastIndex)
+    );
+
+    return output;
+}
+
+async function msaLoadAdminLoginUsers() {
+
+    try {
+
+        const response =
+            await fetch("/api/admin/login-users");
+
+        const data =
+            await response.json();
+
+        if (!response.ok || !data.ok) {
+            return;
+        }
+
+        MSA_ADMIN_LOGIN_USERS =
+            Array.isArray(data.users)
+                ? data.users
+                : [];
+
+    } catch (error) {
+
+        console.error(
+            "ADMIN NAME SEARCH ERROR:",
+            error
+        );
+    }
+}
+
+function msaShowAdminSuggestions(value) {
+    const input = document.getElementById("adminUsername");
+    const box = document.getElementById("adminUsernameSuggestions");
+
+    if (!input || !box) return;
+
+    const search = String(value || "").trim().toLowerCase();
+
+    if (!search) {
+        box.innerHTML = "";
+        box.classList.remove("msa-admin-search-results-visible");
+        box.setAttribute("aria-hidden", "true");
+        return;
+    }
+
+    const matches = (Array.isArray(MSA_ADMIN_LOGIN_USERS) ? MSA_ADMIN_LOGIN_USERS : [])
+        .filter(function(admin) {
+            const username = String(admin.username || "").toLowerCase();
+            const name = String(admin.display_name || "").toLowerCase();
+            return username.includes(search) || name.includes(search);
+        });
+
+    if (matches.length) {
+        box.innerHTML = `
+            <div class="msa-admin-search-empty">
+                ✓ Administrator found
+            </div>
+        `;
+    } else {
+        box.innerHTML = `
+            <div class="msa-admin-search-empty">
+                No matching administrator found
+            </div>
+        `;
+    }
+
+    box.classList.add("msa-admin-search-results-visible");
+    box.setAttribute("aria-hidden", "false");
+}
+
+function startAdminUsernameSearch() {
+
+    const input =
+        document.getElementById(
+            "adminUsername"
+        );
+
+    if (!input) {
+        return;
+    }
+
+    input.addEventListener(
+        "input",
+        function() {
+
+            msaShowAdminSuggestions(
+                input.value
+            );
+        }
+    );
+
+    input.addEventListener(
+        "focus",
+        function() {
+
+            if (input.value.trim()) {
+
+                msaShowAdminSuggestions(
+                    input.value
+                );
+            }
+        }
+    );
+
+    document.addEventListener(
+        "click",
+        function(event) {
+
+            const box =
+                document.getElementById(
+                    "adminUsernameSuggestions"
+                );
+
+            if (!box) {
+                return;
+            }
+
+            if (
+                event.target !== input &&
+                !box.contains(event.target)
+            ) {
+
+                box.classList.remove(
+                    "msa-admin-search-results-visible"
+                );
+
+                box.setAttribute(
+                    "aria-hidden",
+                    "true"
+                );
+            }
+        }
+    );
+
+    msaLoadAdminLoginUsers();
+}
+
+document.addEventListener(
+    "DOMContentLoaded",
+    startAdminUsernameSearch
+);
+
+let students = [];
+let results = JSON.parse(localStorage.getItem("msa_results") || "[]");
+
+
+
+// ======================================================
+// ADMIN LOGIN WELCOME SCREEN
+// ======================================================
+
+function showAdminWelcome(admin, afterWelcome) {
+
+    const adminData = admin || {};
+
+    const cleanName =
+        String(
+            adminData.display_name ||
+            adminData.username ||
+            "Administrator"
+        ).trim() || "Administrator";
+
+    const welcomeKey =
+        "MSA_PORTAL_ADMIN_WELCOME_SEEN_" +
+        String(
+            adminData.id ||
+            adminData.username ||
+            cleanName
+        ).toUpperCase();
+
+    let returningAdmin = false;
+
+    try {
+
+        returningAdmin =
+            localStorage.getItem(welcomeKey) === "1";
+
+        localStorage.setItem(
+            welcomeKey,
+            "1"
+        );
+
+    } catch (error) {
+
+        console.warn(
+            "MSA: Admin welcome state unavailable.",
+            error
+        );
+    }
+
+    const heading =
+        returningAdmin
+            ? "WELCOME BACK"
+            : "WELCOME TO MSA PORTAL";
+
+    const overlay =
+        document.createElement("div");
+
+    overlay.className =
+        "msa-admin-welcome-overlay";
+
+    const safeName =
+        cleanName
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+
+    overlay.innerHTML = `
+        <div class="msa-admin-welcome-glow"></div>
+
+        <div class="msa-admin-welcome-card">
+
+            <div class="msa-admin-welcome-logo-wrap">
+
+                <img
+                    src="/assets/mwashita_logo.jpg"
+                    class="msa-admin-welcome-logo"
+                    alt="MSA PORTAL"
+                >
+
+            </div>
+
+            <div class="msa-admin-welcome-line"></div>
+
+            <div class="msa-admin-welcome-heading">
+                ${heading}
+            </div>
+
+            <div class="msa-admin-welcome-name">
+                ${safeName}
+            </div>
+
+            <div class="msa-admin-welcome-status">
+                SIGNING YOU IN...
+            </div>
+
+            <div class="msa-admin-welcome-loader">
+                <span></span>
+            </div>
+
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    window.setTimeout(function() {
+
+        overlay.classList.add(
+            "msa-admin-welcome-overlay-hide"
+        );
+
+        window.setTimeout(function() {
+
+            if (overlay.parentNode) {
+                overlay.parentNode.removeChild(
+                    overlay
+                );
+            }
+
+            if (typeof afterWelcome === "function") {
+                afterWelcome();
+            }
+
+        }, 350);
+
+    }, 1800);
+}
+
+// ======================================================
+// ADMIN LOGIN
+// ======================================================
+
+async function login() {
+    const username =
+        document.getElementById("adminUsername");
+
+    const password =
+        document.getElementById("adminPassword");
+
+    const message =
+        document.getElementById("loginMessage");
+
+    if (!username || !password) {
+        alert("Login form is not available.");
+        return;
+    }
+
+    const user = username.value.trim();
+    const pass = password.value.trim();
+
+    if (!user || !pass) {
+        if (message) {
+            message.textContent =
+                "Enter username and password.";
+        }
+        return;
+    }
+
+    try {
+
+        const response = await fetch(
+            "/api/admin/login",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type":
+                        "application/json"
+                },
+                body: JSON.stringify({
+                    username: user,
+                    password: pass
+                })
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+
+            if (message) {
+                message.textContent =
+                    data.message ||
+                    "Incorrect username or password.";
+                message.style.color =
+                    "#f59e0b";
+            }
+
+            password.value = "";
+            return;
+        }
+
+        localStorage.setItem(
+            "MSA_ADMIN_TOKEN",
+            data.token
+        );
+
+        /* Keep the logged-in administrator role for dashboard permissions. */
+        if (data.admin) {
+            localStorage.setItem(
+                "MSA_ADMIN_USER",
+                JSON.stringify(data.admin)
+            );
+        }
+
+        if (message) {
+            message.textContent =
+                "Login successful.";
+            message.style.color =
+                "#f5d477";
+        }
+
+        const loggedInAdmin =
+            data.admin ||
+            JSON.parse(
+                localStorage.getItem("MSA_ADMIN_USER") || "null"
+            );
+
+        if (loggedInAdmin && loggedInAdmin.role === "main_admin") {
+            showMainAdminDashboard();
+        } else {
+            showAdminDashboard();
+        }
+
+    } catch (error) {
+
+        console.error(
+            "ADMIN LOGIN ERROR:",
+            error
+        );
+
+        if (message) {
+            message.textContent =
+                "Unable to connect to server.";
+        }
+    }
+}
+
+
+// ======================================================
+// DASHBOARD
+// ======================================================
+
+function showDashboard() {
+
+    let adminUser = null;
+
+    try {
+        adminUser = JSON.parse(
+            localStorage.getItem("MSA_ADMIN_USER") || "null"
+        );
+    } catch (error) {
+        console.error("ADMIN USER DATA ERROR:", error);
+    }
+
+    /*
+     * ONE LOGIN AREA
+     *
+     * Main Administrator:
+     *     role = main_admin
+     *
+     * Admin 1-5:
+     *     role = admin
+     *
+     * The server already identifies the administrator.
+     */
+    if (
+        adminUser &&
+        adminUser.role === "main_admin"
+    ) {
+        showMainAdminDashboard();
+        return;
+    }
+
+    showAdminDashboard();
+}
+
+
+
+async function refreshCurrentAdminProfile() {
+    const token =
+        localStorage.getItem("MSA_ADMIN_TOKEN");
+
+    if (!token) {
+        return null;
+    }
+
+    try {
+        const response = await fetch(
+            "/api/admin/current",
+            {
+                method: "GET",
+                headers: {
+                    "Authorization":
+                        "Bearer " + token
+                }
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+
+            console.error(
+                "CURRENT ADMIN PROFILE ERROR:",
+                data.message || "Unable to refresh administrator."
+            );
+
+            if (
+                response.status === 401 ||
+                response.status === 403
+            ) {
+                localStorage.removeItem(
+                    "MSA_ADMIN_TOKEN"
+                );
+
+                localStorage.removeItem(
+                    "MSA_ADMIN_USER"
+                );
+
+                alert(
+                    data.message ||
+                    "Your administrator access is no longer available."
+                );
+
+                location.reload();
+            }
+
+            return null;
+        }
+
+        if (data.admin) {
+            localStorage.setItem(
+                "MSA_ADMIN_USER",
+                JSON.stringify(data.admin)
+            );
+        }
+
+        return data.admin || null;
+
+    } catch (error) {
+
+        console.error(
+            "CURRENT ADMIN PROFILE REFRESH ERROR:",
+            error
+        );
+
+        return null;
+    }
+}
+
+
+function startAdminProfileRefresh() {
+
+    if (window.MSA_ADMIN_PROFILE_REFRESH_TIMER) {
+        clearInterval(
+            window.MSA_ADMIN_PROFILE_REFRESH_TIMER
+        );
+    }
+
+    window.MSA_ADMIN_PROFILE_REFRESH_TIMER =
+        setInterval(async () => {
+
+            const admin =
+                await refreshCurrentAdminProfile();
+
+            if (!admin) {
+                return;
+            }
+
+            const welcome =
+                document.getElementById(
+                    "adminWelcomeName"
+                );
+
+            if (welcome) {
+                welcome.textContent =
+                    admin.display_name ||
+                    "Administrator";
+            }
+
+        }, 5000);
+}
+
+
+
+
+function showAdminDashboard() {
+    renderAdminDashboard();
+}
+
+function showMainAdminDashboard() {
+    renderMainAdminDashboard();
+}
+
+
+function renderAdminDashboard() {
+
+    let adminUser = null;
+
+    try {
+        adminUser = JSON.parse(
+            localStorage.getItem("MSA_ADMIN_USER") || "null"
+        );
+    } catch (error) {
+        console.error("ADMIN USER DATA ERROR:", error);
+    }
+
+    document.body.innerHTML = `
+        <div style="
+            min-height:100vh;
+            background:#07111f;
+            color:white;
+            font-family:Arial,sans-serif;
+        ">
+
+            <header style="
+                padding:20px;
+                background:#0d1b2e;
+                border-bottom:1px solid #203553;
+                display:flex;
+                justify-content:space-between;
+                align-items:center;
+                gap:15px;
+                flex-wrap:wrap;
+            ">
+                <div>
+                    <h1 style="margin:0;">MSA PORTAL</h1>
+                    <p style="margin:5px 0;color:#91a4bd;">
+                        Administrator Dashboard
+                    </p>
+                </div>
+
+                <button onclick="logout()" style="
+                    background:#07111f;
+                    color:white;
+                    border:0;
+                    padding:12px 18px;
+                    border-radius:9px;
+                    font-weight:bold;
+                ">
+                    LOGOUT
+                </button>
+            </header>
+
+            <main style="
+                max-width:1100px;
+                margin:auto;
+                padding:20px;
+            ">
+
+                <div style="
+                    background:#0d1b2e;
+                    border:1px solid #203553;
+                    border-radius:16px;
+                    padding:18px;
+                    margin-bottom:25px;
+                ">
+                    <h2 style="margin:0 0 6px;">
+                        Administrator Dashboard
+                    </h2>
+
+                    <p style="
+                        margin:0;
+                        color:#91a4bd;
+                    ">
+                        Welcome,
+                        <span id="adminWelcomeName">
+                            ${escapeHtml(
+                                adminUser?.display_name || "Administrator"
+                            )}
+                        </span>
+                    </p>
+                </div>
+
+                <div style="
+                    display:grid;
+                    grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+                    gap:15px;
+                    margin-bottom:25px;
+                ">
+
+                    <div class="stat-card">
+                        <strong id="studentCount">0</strong>
+                        <span>Students</span>
+                    </div>
+
+                    <div class="stat-card">
+                        <strong id="resultCount">0</strong>
+                        <span>Results</span>
+                    </div>
+
+                    <div class="stat-card">
+                        <strong id="publishedCount">0</strong>
+                        <span>Published</span>
+                    </div>
+
+                    <div class="stat-card">
+                        <strong id="missingCount">0</strong>
+                        <span>Missing</span>
+                    </div>
+
+                </div>
+
+                <h2>Administration Menu</h2>
+
+                <div class="dashboard-menu-grid">
+
+                    <button
+                        type="button"
+                        class="dashboard-menu-card"
+                        onclick="showStudentManagementScreen()">
+                        <span class="dashboard-menu-icon">👨‍🎓</span>
+                        <strong>Student Management</strong>
+                        <small>Add, view and manage students</small>
+                    </button>
+
+                    <button
+                        type="button"
+                        class="dashboard-menu-card"
+                        onclick="showPasswordResetScreen()">
+                        <span class="dashboard-menu-icon">🔐</span>
+                        <strong>Password / PIN Reset</strong>
+                        <small>Manage password and PIN requests</small>
+                    </button>
+
+                    <button
+                        type="button"
+                        class="dashboard-menu-card"
+                        onclick="showResultsManagementScreen()">
+                        <span class="dashboard-menu-icon">📄</span>
+                        <strong>Results Management</strong>
+                        <small>Upload, check and publish results</small>
+                    </button>
+
+                    <button
+                        type="button"
+                        class="dashboard-menu-card"
+                        onclick="showAcademicManagementScreen()">
+                        <span class="dashboard-menu-icon">📅</span>
+                        <strong>Academic Management</strong>
+                        <small>Manage academic years</small>
+                    </button>
+
+                </div>
+
+                <div id="adminContent"></div>
+                    <footer class="msa-copyright">
+                        ©️ <strong>Mwashita Academy</strong> — All Rights Reserved
+                    </footer>
+
+            </main>
+        </div>
+    `;
+
+    addDashboardStyles();
+    /*
+     * Keep this administrator account synchronized
+     * with the server.
+     */
+    refreshCurrentAdminProfile().then((admin) => {
+
+        if (!admin) {
+            return;
+        }
+
+        const welcome =
+            document.getElementById(
+                "adminWelcomeName"
+            );
+
+        if (welcome) {
+            welcome.textContent =
+                admin.display_name ||
+                "Administrator";
+        }
+
+    });
+
+    startAdminProfileRefresh();
+
+
+    loadStudents();
+    loadStats();
+}
+
+
+function renderMainAdminDashboard() {
+
+    document.body.innerHTML = `
+        <div style="
+            min-height:100vh;
+            background:#07111f;
+            color:white;
+            font-family:Arial,sans-serif;
+        ">
+
+            <header style="
+                padding:20px;
+                background:#0d1b2e;
+                border-bottom:1px solid #203553;
+                display:flex;
+                justify-content:space-between;
+                align-items:center;
+                gap:15px;
+                flex-wrap:wrap;
+            ">
+                <div>
+                    <h1 style="margin:0;">MSA PORTAL</h1>
+                    <p style="margin:5px 0;color:#91a4bd;">
+                        Main Administrator Dashboard
+                    </p>
+                </div>
+
+                <button onclick="logout()" style="
+                    background:#07111f;
+                    color:white;
+                    border:0;
+                    padding:12px 18px;
+                    border-radius:9px;
+                    font-weight:bold;
+                ">
+                    LOGOUT
+                </button>
+            </header>
+
+            <main style="
+                max-width:1100px;
+                margin:auto;
+                padding:20px;
+            ">
+
+                <div style="
+                    background:#0d1b2e;
+                    border:1px solid #203553;
+                    border-radius:16px;
+                    padding:18px;
+                    margin-bottom:25px;
+                ">
+                    <h2 style="margin:0 0 6px;">
+                        Main Administrator Dashboard
+                    </h2>
+
+                    <p style="
+                        margin:0;
+                        color:#91a4bd;
+                    ">
+                        Full system administration
+                    </p>
+                </div>
+
+                <div style="
+                    display:grid;
+                    grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+                    gap:15px;
+                    margin-bottom:25px;
+                ">
+
+                    <div class="stat-card">
+                        <strong id="studentCount">0</strong>
+                        <span>Students</span>
+                    </div>
+
+                    <div class="stat-card">
+                        <strong id="resultCount">0</strong>
+                        <span>Results</span>
+                    </div>
+
+                    <div class="stat-card">
+                        <strong id="publishedCount">0</strong>
+                        <span>Published</span>
+                    </div>
+
+                    <div class="stat-card">
+                        <strong id="missingCount">0</strong>
+                        <span>Missing</span>
+                    </div>
+
+                </div>
+
+                <h2>Administration Menu</h2>
+
+                <div class="dashboard-menu-grid">
+
+                    <button
+                        type="button"
+                        class="dashboard-menu-card"
+                        onclick="showStudentManagementScreen()">
+                        <span class="dashboard-menu-icon">👨‍🎓</span>
+                        <strong>Student Management</strong>
+                        <small>Add, view and manage students</small>
+                    </button>
+
+                    <button
+                        type="button"
+                        class="dashboard-menu-card"
+                        onclick="showPasswordResetScreen()">
+                        <span class="dashboard-menu-icon">🔐</span>
+                        <strong>Password / PIN Reset</strong>
+                        <small>Manage password and PIN requests</small>
+                    </button>
+
+                    <button
+                        type="button"
+                        class="dashboard-menu-card"
+                        onclick="showResultsManagementScreen()">
+                        <span class="dashboard-menu-icon">📄</span>
+                        <strong>Results Management</strong>
+                        <small>Upload, check and publish results</small>
+                    </button>
+
+                    <button
+                        type="button"
+                        class="dashboard-menu-card"
+                        onclick="showAcademicManagementScreen()">
+                        <span class="dashboard-menu-icon">📅</span>
+                        <strong>Academic Management</strong>
+                        <small>Manage academic years</small>
+                    </button>
+
+                </div>
+
+                <div id="mainAdminMenu">
+                    <h2>Main Administrator</h2>
+
+                    <button
+                        type="button"
+                        class="dashboard-menu-card"
+                        onclick="showMainAdminPanel()"
+                    >
+                        <span class="dashboard-menu-icon">👑</span>
+                        <strong>Main Administrator</strong>
+                        <small>Manage administrator accounts</small>
+                    </button>
+                </div>
+
+                <div id="adminContent"></div>
+
+            </main>
+        </div>
+    `;
+
+    addDashboardStyles();
+
+    loadStudents();
+    loadStats();
+}
+
+
+// ======================================================
+// DASHBOARD STYLES
+// ======================================================
+
+function addDashboardStyles() {
+
+    if (document.getElementById("adminStyles")) return;
+
+    const style = document.createElement("style");
+    style.id = "adminStyles";
+
+    style.innerHTML = `
+        h2 {
+            margin-top:30px;
+        }
+
+        .stat-card {
+            background:#0d1b2e;
+            border:1px solid #203553;
+            border-radius:14px;
+            padding:20px;
+        }
+
+        .stat-card strong {
+            display:block;
+            font-size:30px;
+            margin-bottom:8px;
+        }
+
+        .stat-card span {
+            color:#91a4bd;
+        }
+
+        .action-grid {
+            display:grid;
+            grid-template-columns:
+                repeat(auto-fit,minmax(180px,1fr));
+            gap:15px;
+        }
+
+        .action-card {
+            background:#0d1b2e;
+            border:1px solid #203553;
+            border-radius:14px;
+            padding:20px;
+            color:white;
+            text-align:left;
+            cursor:pointer;
+            min-height:130px;
+        }
+
+        .action-card:hover {
+            border-color:#3b82f6;
+        }
+
+        .action-card strong,
+        .action-card small {
+            display:block;
+            margin-top:10px;
+        }
+
+        .action-card small {
+            color:#91a4bd;
+        }
+
+        .admin-panel {
+            margin-top:25px;
+            background:#0d1b2e;
+            border:1px solid #203553;
+            border-radius:16px;
+            padding:20px;
+        }
+
+        .admin-input,
+        .admin-select {
+            width:100%;
+            padding:13px;
+            margin:7px 0 15px;
+            background:#081525;
+            color:white;
+            border:1px solid #29415f;
+            border-radius:9px;
+        }
+
+        .admin-button {
+            border:0;
+            border-radius:9px;
+            padding:12px 18px;
+            margin:5px;
+            background:#2563eb;
+            color:white;
+            font-weight:bold;
+            cursor:pointer;
+        }
+
+        .danger {
+            background:#07111f;
+        }
+
+        .success {
+            background:#2563eb;
+        }
+
+        .student-row,
+        .result-row,
+        .year-row {
+            background:#081525;
+            border:1px solid #203553;
+            border-radius:10px;
+            padding:15px;
+            margin:10px 0;
+        }
+
+        .muted {
+            color:#91a4bd;
+        }
+    `;
+
+    document.head.appendChild(style);
+}
+
+
+// ======================================================
+// ADD STUDENT
+// ======================================================
+
+function showAddStudent() {
+
+    const content = document.getElementById("adminContent");
+
+    content.innerHTML = `
+        <div class="admin-panel">
+
+            <h2>Add Student</h2>
+
+            <label>Student Name</label>
+            <input id="studentName"
+                   class="admin-input"
+                   placeholder="Enter student name">
+
+            <label>Form</label>
+            <select id="studentForm" class="admin-select">
+                <option value="">Select Form</option>
+                <option value="1">Form 1</option>
+                <option value="2">Form 2</option>
+                <option value="3">Form 3</option>
+                <option value="4">Form 4</option>
+                <option value="5">Form 5</option>
+                <option value="6">Form 6</option>
+            </select>
+
+            <label>Class</label>
+            <input id="studentClass"
+                   class="admin-input"
+                   placeholder="Example: 3A">
+
+            <label>Password / PIN</label>
+            <input id="studentPassword"
+                   class="admin-input"
+                   type="password"
+                   placeholder="Student password">
+
+            <label>Status</label>
+            <select id="studentStatus" class="admin-select">
+                <option value="Active">Active</option>
+                <option value="Disabled">Disabled</option>
+            </select>
+
+            <button class="admin-button"
+                    onclick="saveStudent()">
+                SAVE STUDENT
+            </button>
+
+            <button class="admin-button"
+                    onclick="clearStudentForm()">
+                CLEAR
+            </button>
+
+            <div id="studentMessage"></div>
+
+        </div>
+    `;
+}
+
+
+// ======================================================
+// SAVE STUDENT
+// ======================================================
+
+async function saveStudent() {
+
+    const name = document.getElementById("studentName").value.trim();
+    const form = document.getElementById("studentForm").value;
+    const className = document.getElementById("studentClass").value.trim();
+    const password = document.getElementById("studentPassword").value.trim();
+    const status = document.getElementById("studentStatus").value;
+    const message = document.getElementById("studentMessage");
+
+    if (!name || !form || !className || !password) {
+        message.innerHTML =
+            `<p style="color:#f59e0b;">
+                Please complete all fields.
+            </p>`;
+        return;
+    }
+
+    try {
+
+        const response = await fetch(
+            API + "/students",
+            {
+                method:"POST",
+                headers:{
+                    "Content-Type":"application/json"
+                },
+                body:JSON.stringify({
+                    name:name,
+                    form:Number(form),
+                    class_name:className,
+                    password:password,
+                    status:status
+                })
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error(data.message || "Could not save student.");
+        }
+
+        message.innerHTML =
+            `<p style="color:#f5d477;">
+                ✓ Student saved successfully.
+                <br>
+                <strong style="font-size:16px;">
+                    STUDENT ID: ${escapeHtml(data.student_id_code || "CHECK MANAGEMENT")}
+                </strong>
+            </p>`;
+
+        clearStudentForm();
+
+        loadStudents();
+        loadStats();
+
+    } catch(error) {
+
+        message.innerHTML =
+            `<p style="color:#f59e0b;">
+                Error: ${escapeHtml(error.message)}
+            </p>`;
+    }
+}
+
+
+function clearStudentForm() {
+
+    const ids = [
+        "studentName",
+        "studentClass",
+        "studentPassword"
+    ];
+
+    ids.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) element.value = "";
+    });
+
+    const form = document.getElementById("studentForm");
+    if (form) form.value = "";
+}
+
+
+// ======================================================
+// LOAD STUDENTS
+// ======================================================
+
+async function loadStudents() {
+
+    try {
+
+        const response = await fetch(API + "/students");
+        const data = await response.json();
+
+        if (data.ok) {
+            students = data.students || data.data || [];
+        } else {
+            students = [];
+        }
+
+    } catch(error) {
+
+        console.log("Student API error:", error);
+        students = [];
+    }
+
+    renderStudents();
+    loadStats();
+}
+
+
+// ======================================================
+// STUDENTS PAGE
+// ======================================================
+
+function showStudents() {
+
+    const content = document.getElementById("adminContent");
+
+    content.innerHTML = `
+        <div class="admin-panel">
+
+            <h2>Students</h2>
+
+            <input
+                id="studentSearch"
+                class="admin-input"
+                placeholder="Search student name..."
+                oninput="filterStudents()"
+            >
+
+            <div id="studentsList">
+                Loading students...
+            </div>
+
+        </div>
+    `;
+
+    renderStudents();
+}
+
+
+function renderStudents(list) {
+
+    const container =
+        document.getElementById("studentsList");
+
+    if (!container) {
+        return;
+    }
+
+    if (!Array.isArray(list)) {
+        list = [];
+    }
+
+    if (list.length === 0) {
+
+        container.innerHTML = `
+            <p class="muted">
+                No students found.
+            </p>
+        `;
+
+        return;
+    }
+
+    container.innerHTML = list.map(student => {
+
+        const status =
+            String(student.status || "Active")
+                .trim();
+
+        const isDisabled =
+            status.toLowerCase() === "disabled";
+
+        const statusButton =
+            isDisabled
+                ? "ACTIVATE"
+                : "DISABLE";
+
+        return `
+            <div class="student-row">
+
+                <strong>
+                    ${escapeHtml(student.name)}
+                    </h3>
+                    <div class="msa-student-id-badge">
+                        STUDENT ID:
+                        ${escapeHtml(student.student_id_code || "NOT ASSIGNED")}
+                    </div>
+                    <h3>
+                </strong>
+
+                <p class="muted">
+                    Form ${student.form}
+                    • ${escapeHtml(student.class_name || "")}
+                </p>
+
+                <p>
+                    Status:
+                    <strong>
+                        ${escapeHtml(status)}
+                    </strong>
+                </p>
+
+                <button
+                    class="admin-button"
+                    type="button"
+                    onclick="editStudent(${Number(student.id)})"
+                >
+                    EDIT
+                </button>
+
+                <button
+                    class="admin-button"
+                    type="button"
+                    onclick="resetStudentPassword(${Number(student.id)})"
+                >
+                    RESET PASSWORD
+                </button>
+
+                <button
+                    class="admin-button"
+                    type="button"
+                    onclick="toggleStudentStatus(${Number(student.id)})"
+                >
+                    ${statusButton}
+                </button>
+
+                <button
+                    class="admin-button danger"
+                    type="button"
+                    onclick="deleteStudent(${Number(student.id)})"
+                >
+                    DELETE
+                </button>
+
+            </div>
+        `;
+
+    }).join("");
+
+}
+
+
+/* ============================================================
+   NEW PASSWORD / PIN RESET ENTRY
+   ============================================================ */
+function addPasswordPinResetEntry() {
+
+    /*
+     * Find the main Admin content area.
+     * The reset manager must live inside the normal
+     * Admin section instead of being appended to Student Management.
+     */
+    const possibleContainers = [
+        "adminContent",
+        "mainContent",
+        "content",
+        "adminMain",
+        "app"
+    ];
+
+    let container = null;
+
+    for (const id of possibleContainers) {
+        const element = document.getElementById(id);
+        if (element) {
+            container = element;
+            break;
+        }
+    }
+
+    /*
+     * If the Admin page uses the dashboard itself as the
+     * section container, use its main visible container.
+     */
+    if (!container) {
+        container =
+            document.querySelector("main") ||
+            document.querySelector(".admin-content") ||
+            document.querySelector(".admin-main") ||
+            document.querySelector(".content");
+    }
+
+    if (!container) {
+        alert("Admin content area could not be found.");
+        return;
+    }
+
+    /*
+     * Hide the current Admin section.
+     */
+    container
+        .querySelectorAll(
+            ".admin-section, .dashboard-section, .student-management-section"
+        )
+        .forEach(section => {
+            section.style.display = "none";
+        });
+
+    /*
+     * Create the reset panel.
+     */
+    let panel =
+        document.getElementById("passwordResetPanel");
+
+    if (!panel) {
+
+        panel =
+            document.createElement("section");
+
+        panel.id =
+            "passwordResetPanel";
+
+        panel.className =
+            "admin-section password-reset-admin-panel";
+
+        container.appendChild(panel);
+
+        panel.innerHTML = `
+            <div class="admin-section-header">
+
+                <button
+                    type="button"
+                    class="admin-button"
+                    id="passwordResetBackButton"
+                >
+                    ← BACK TO ADMIN DASHBOARD
+                </button>
+
+                <div style="margin-top:20px;">
+                    <h2>
+                        🔐 PASSWORD / PIN RESET
+                    </h2>
+
+                    <p class="muted">
+                        Student password and PIN recovery management
+                    </p>
+                </div>
+
+            </div>
+
+            <div
+                style="
+                    margin-top:20px;
+                    display:flex;
+                    align-items:center;
+                    justify-content:space-between;
+                    gap:12px;
+                    flex-wrap:wrap;
+                "
+            >
+
+                <div
+                    id="resetNewRequestIndicator"
+                    class="admin-button"
+                    style="
+                        display:inline-block;
+                        width:auto;
+                        margin:0;
+                        font-weight:800;
+                    "
+                >
+                    🔴 NEW REQUESTS: 0
+                </div>
+
+                <button
+                    type="button"
+                    class="admin-button"
+                    onclick="loadPasswordResetRequests()"
+                >
+                    🔄 REFRESH REQUESTS
+                </button>
+
+            </div>
+
+            
+<div style="margin-top:12px;">
+    <button type="button"
+        class="admin-button"
+        onclick="clearAllPasswordResetRecords()">
+        🗑 CLEAR ALL
+    </button>
+</div>
+<div id="passwordResetRequests" style="margin-top:20px;">
+
+                <section class="reset-section">
+                    <h3>🔴 NEW REQUESTS</h3>
+                    <div id="newPasswordResetRequests">
+                        Loading new requests...
+                    </div>
+                </section>
+
+                <section class="reset-section" style="margin-top:24px;">
+                    <h3>📁 OLD REQUEST HISTORY</h3>
+                    <div id="oldPasswordResetRequests">
+                        Loading old request history...
+                    </div>
+                </section>
+
+                <section class="reset-section" style="margin-top:24px;">
+                    <h3>⚠️ NOT APPROVED ATTEMPTS</h3>
+                    <div id="failedPasswordResetAttempts">
+                        Loading not-approved attempts...
+                    </div>
+                </section>
+
+            </div>
+        `;
+
+        const backButton =
+            document.getElementById(
+                "passwordResetBackButton"
+            );
+
+        if (backButton) {
+            backButton.onclick = function () {
+
+                panel.style.display = "none";
+
+                if (
+                    typeof showDashboard ===
+                    "function"
+                ) {
+                    showDashboard();
+                } else {
+                    window.scrollTo({
+                        top: 0,
+                        behavior: "smooth"
+                    });
+                }
+            };
+        }
+    }
+
+    /*
+     * Show only the Password/PIN Reset section.
+     */
+    panel.style.display = "block";
+
+    /*
+     * Load current and historical requests.
+     */
+    if (
+        typeof loadPasswordResetRequests ===
+        "function"
+    ) {
+        loadPasswordResetRequests();
+    }
+
+    /*
+     * Automatic refresh every 15 seconds.
+     */
+    if (window.passwordResetRefresh) {
+        clearInterval(
+            window.passwordResetRefresh
+        );
+    }
+
+    window.passwordResetRefresh =
+        setInterval(
+            loadPasswordResetRequests,
+            15000
+        );
+
+    panel.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+    });
+}
+
+
+function filterStudents() {
+    const searchInput =
+        document.getElementById("studentSearch");
+
+    const container =
+        document.getElementById("studentsList");
+
+    if (!searchInput || !container) {
+        return;
+    }
+
+    const search =
+        searchInput.value
+            .toLowerCase()
+            .trim();
+
+    // Empty search: never show the full student list.
+    if (!search) {
+        container.innerHTML = `
+            <div class="empty-state">
+                Start typing a student name to search.
+            </div>
+        `;
+        return;
+    }
+
+    // Instant partial-name search.
+    const filtered = students.filter(student =>
+        String(student.name || "")
+            .toLowerCase()
+            .includes(search)
+    );
+
+    // Nothing matched.
+    if (filtered.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                Student not found
+            </div>
+        `;
+        return;
+    }
+
+    // Show only matching students.
+    renderStudents(filtered);
+
+    // Password/PIN Reset is a Student Management menu option,
+    // not part of the student search results.
+}
+// STUDENT ACTIONS
+// ======================================================
+
+async function editStudent(id) {
+    const student = students.find(
+        s => Number(s.id) === Number(id)
+    );
+
+    if (!student) {
+        alert("Student not found.");
+        return;
+    }
+
+    const name = prompt(
+        "Student name:",
+        student.name || ""
+    );
+
+    if (name === null) return;
+
+    const cleanName = name.trim();
+
+    if (!cleanName) {
+        alert("Student name is required.");
+        return;
+    }
+
+    const form = prompt(
+        "Form (1-6):",
+        student.form
+    );
+
+    if (form === null) return;
+
+    const formNumber = Number(form);
+
+    if (
+        !Number.isInteger(formNumber) ||
+        formNumber < 1 ||
+        formNumber > 6
+    ) {
+        alert("Invalid form. Enter a number from 1 to 6.");
+        return;
+    }
+
+    const className = prompt(
+        "Class:",
+        student.class_name || ""
+    );
+
+    if (className === null) return;
+
+    const cleanClass = className.trim();
+
+    if (!cleanClass) {
+        alert("Class is required.");
+        return;
+    }
+
+    try {
+        const response = await fetch(
+            API + "/students/update",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    student_id: Number(student.id),
+                    name: cleanName,
+                    form: formNumber,
+                    class_name: cleanClass
+                })
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            alert(
+                data.message ||
+                "Unable to update student."
+            );
+            return;
+        }
+
+        alert("Student updated successfully.");
+
+        if (typeof loadStudents === "function") {
+            await loadStudents();
+        }
+
+    } catch (error) {
+        console.error(error);
+        alert(
+            "Connection error while updating student."
+        );
+    }
+}
+
+async function resetStudentPassword(id) {
+    const student = students.find(
+        s => Number(s.id) === Number(id)
+    );
+
+    if (!student) {
+        alert("Student not found.");
+        return;
+    }
+
+    const confirmed = confirm(
+        "Reset the password/PIN for " +
+        student.name +
+        "?"
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    try {
+        const response = await fetch(
+            API + "/students/reset-password",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    student_id: Number(student.id)
+                })
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            alert(
+                data.message ||
+                "Unable to reset password."
+            );
+            return;
+        }
+
+        alert(
+            "PASSWORD / PIN RESET SUCCESSFUL\\n\\n" +
+            "Student: " +
+            student.name +
+            "\\n\\n" +
+            "Temporary PIN:\\n" +
+            data.temporary_pin +
+            "\\n\\n" +
+            "Give this PIN to the student."
+        );
+
+        if (typeof loadStudents === "function") {
+            await loadStudents();
+        }
+
+    } catch (error) {
+        console.error(error);
+
+        alert(
+            "Connection error while resetting password."
+        );
+    }
+}
+
+
+async function toggleStudent(id) {
+    return toggleStudentStatus(Number(id));
+}
+
+async function deleteStudent(id) {
+    const student = students.find(
+        s => Number(s.id) === Number(id)
+    );
+
+    if (!student) {
+        alert("Student not found.");
+        return;
+    }
+
+    const confirmed = confirm(
+        "PERMANENT DELETE\\n\\n" +
+        "Student: " +
+        student.name +
+        "\\n" +
+        "Form: " +
+        student.form +
+        "\\n" +
+        "Class: " +
+        student.class_name +
+        "\\n\\n" +
+        "This will permanently remove the student " +
+        "account and associated result records.\\n\\n" +
+        "This action CANNOT be undone.\\n\\n" +
+        "Continue?"
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    try {
+        const response = await fetch(
+            API + "/students/delete",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    student_id: Number(student.id)
+                })
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            alert(
+                data.message ||
+                "Unable to delete student."
+            );
+            return;
+        }
+
+        alert(
+            "Student permanently deleted successfully."
+        );
+
+        if (typeof loadStudents === "function") {
+            await loadStudents();
+        }
+
+    } catch (error) {
+        console.error(error);
+
+        alert(
+            "Connection error while deleting student."
+        );
+    }
+}
+
+
+// ======================================================
+// UPLOAD RESULTS
+// ======================================================
+
+function showUploadResults() {
+
+    const content = document.getElementById("adminContent");
+
+    content.innerHTML = `
+        <div class="admin-panel">
+
+            <h2>Upload Results</h2>
+
+            <label>Form</label>
+
+            <select id="resultForm" class="admin-select">
+                <option value="">Select Form</option>
+                ${[1,2,3,4,5,6].map(f =>
+                    `<option value="${f}">
+                        Form ${f}
+                    </option>`
+                ).join("")}
+            </select>
+
+            <label>Academic Year</label>
+
+            <select id="resultYear"
+                    class="admin-select">
+                ${getAcademicYearOptions()}
+            </select>
+
+            <label>Term</label>
+
+            <select id="resultTerm"
+                    class="admin-select">
+                <option>Term 1</option>
+                <option>Term 2</option>
+                <option>Term 3</option>
+            </select>
+
+            <label>Student</label>
+
+            <select id="resultStudent"
+                    class="admin-select">
+                <option value="">
+                    Select student
+                </option>
+                ${students.map(s => `
+                    <option value="${s.id}">
+                        ${escapeHtml(s.name)}
+                    </option>
+                `).join("")}
+            </select>
+
+            <label>Result PDF</label>
+
+            <input
+                id="resultFile"
+                type="file"
+                accept=".pdf"
+                class="admin-input"
+            >
+
+            <button class="admin-button"
+                    onclick="uploadResult()">
+                UPLOAD RESULT
+            </button>
+
+            <div id="resultMessage"></div>
+
+        </div>
+    `;
+}
+
+
+
+async function uploadResult() {
+    const studentId = document.getElementById("resultStudent");
+    const year = document.getElementById("resultYear");
+    const term = document.getElementById("resultTerm");
+    const file = document.getElementById("resultFile");
+
+    if (!studentId || !year || !term || !file) {
+        alert("Upload form is incomplete.");
+        return;
+    }
+
+    if (!studentId.value) {
+        alert("Please select a student.");
+        return;
+    }
+
+    if (!file.files || !file.files[0]) {
+        alert("Please select a PDF result.");
+        return;
+    }
+
+    const selectedFile = file.files[0];
+
+    if (selectedFile.type !== "application/pdf") {
+        alert("Please select a PDF file.");
+        return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = async function () {
+        try {
+            const base64 = reader.result.split(",")[1];
+
+            const response = await fetch("/api/results", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    student_id: Number(studentId.value),
+                    academic_year: Number(year.value),
+                    term: term.value,
+                    file_name: selectedFile.name,
+                    file_data: base64
+                })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok || !data.ok) {
+                alert(data.message || "Result upload failed.");
+                return;
+            }
+
+            alert("✓ Result uploaded successfully.");
+
+            file.value = "";
+
+            if (typeof loadResults === "function") {
+                await loadResults();
+            }
+
+            if (typeof loadStats === "function") {
+                loadStats();
+            }
+
+            if (typeof showResultStatus === "function") {
+                showResultStatus();
+            }
+
+        } catch (error) {
+            console.error(error);
+            alert("Could not connect to the MSA PORTAL backend.");
+        }
+    };
+
+    reader.readAsDataURL(selectedFile);
+}
+
+async function loadResults() {
+    try {
+        const response = await fetch("/api/results");
+        const data = await response.json();
+
+        if (response.ok && data.ok) {
+            results = data.results || [];
+
+            localStorage.setItem(
+                "msa_results",
+                JSON.stringify(results)
+            );
+
+            return true;
+        }
+
+        console.error(
+            data.message || "Could not load results."
+        );
+
+        return false;
+
+    } catch (error) {
+        console.error(
+            "Could not load results:",
+            error
+        );
+
+        return false;
+    }
+}
+
+
+async function showResultStatus() {
+
+    await loadResults();
+
+    const content =
+        document.getElementById("adminContent");
+
+    content.innerHTML = `
+        <div class="admin-panel">
+
+            <h2>Result Status</h2>
+
+            <div id="resultStatusList">
+                ${renderResultsHtml()}
+            </div>
+
+        </div>
+    `;
+}
+
+
+function renderResultsHtml() {
+
+    if (!results.length) {
+        return `
+            <p class="muted">
+                No results uploaded yet.
+            </p>
+        `;
+    }
+
+    return results.map(result => `
+
+        <div class="result-row">
+
+            <strong>
+                ${escapeHtml(result.student_name)}
+            </strong>
+
+            <p class="muted">
+                ${result.academic_year}
+                • ${escapeHtml(result.term)}
+            </p>
+
+            <p>
+                File:
+                ${escapeHtml(result.file_name)}
+            </p>
+
+            <p>
+                Status:
+                <strong>
+                    ${result.published ?
+                        "Published" :
+                        "Draft"}
+                </strong>
+            </p>
+
+        </div>
+
+    `).join("");
+}
+
+
+// ======================================================
+// PUBLISH RESULTS
+// ======================================================
+
+async function showPublishResults() {
+
+    await loadResults();
+
+    const content =
+        document.getElementById("adminContent");
+
+    content.innerHTML = `
+        <div class="admin-panel">
+
+            <h2>Publish Results</h2>
+
+            <p class="muted">
+                Publish uploaded results so students
+                can view them.
+            </p>
+
+            <div id="publishList">
+                ${renderPublishList()}
+            </div>
+
+        </div>
+    `;
+}
+
+
+function renderPublishList() {
+
+    if (!results.length) {
+
+        return `
+            <p class="muted">
+                No results available.
+            </p>
+        `;
+    }
+
+    return results.map(result => `
+
+        <div class="result-row">
+
+            <strong>
+                ${escapeHtml(result.student_name)}
+            </strong>
+
+            <p>
+                ${result.academic_year}
+                • ${escapeHtml(result.term)}
+            </p>
+
+            ${
+                result.published
+                ?
+                `<button class="admin-button success"
+                         disabled>
+                    PUBLISHED
+                </button>`
+                :
+                `<button class="admin-button"
+                         onclick="publishResult(${result.id})">
+                    PUBLISH
+                </button>`
+            }
+
+        </div>
+
+    `).join("");
+}
+
+
+
+async function publishResult(id) {
+    if (!id) {
+        alert("Invalid result ID.");
+        return;
+    }
+
+    if (!confirm("Publish this result? The student will be able to view it.")) {
+        return;
+    }
+
+    try {
+        const response = await fetch(
+            "/api/results/" + id + "/publish",
+            {
+                method: "POST"
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            alert(data.message || "Could not publish result.");
+            return;
+        }
+
+        alert("✓ Result published successfully.");
+
+        await loadResults();
+
+        if (typeof loadStats === "function") {
+            loadStats();
+        }
+
+        if (typeof showPublishResults === "function") {
+            await showPublishResults();
+        }
+
+    } catch (error) {
+        console.error(error);
+        alert("Could not connect to the MSA PORTAL backend.");
+    }
+}
+
+function getStoredAcademicYears() {
+
+    const saved =
+        localStorage.getItem("msa_academic_years");
+
+    if (saved) {
+        try {
+            return JSON.parse(saved);
+        } catch(error) {}
+    }
+
+    const years = [];
+
+    for (let year = 2026; year <= 2100; year++) {
+
+        years.push({
+            year:year,
+            active:year === 2026
+        });
+    }
+
+    localStorage.setItem(
+        "msa_academic_years",
+        JSON.stringify(years)
+    );
+
+    return years;
+}
+
+
+function getAcademicYearOptions() {
+
+    return getStoredAcademicYears()
+        .map(item =>
+            `<option value="${item.year}"
+                ${item.active ? "selected" : ""}>
+                ${item.year}
+            </option>`
+        )
+        .join("");
+}
+
+
+function showAcademicYears() {
+
+    const content =
+        document.getElementById("adminContent");
+
+    content.innerHTML = `
+        <div class="admin-panel">
+
+            <h2>Academic Years</h2>
+
+            <p class="muted">
+                Manage the academic years used by MSA PORTAL.
+            </p>
+
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                <input
+                    id="newAcademicYear"
+                    class="admin-input"
+                    style="max-width:200px;"
+                    type="number"
+                    placeholder="Example: 2027"
+                >
+
+                <button class="admin-button"
+                        onclick="addAcademicYear()">
+                    ADD YEAR
+                </button>
+            </div>
+
+            <div id="academicYearsList">
+                ${renderAcademicYears()}
+            </div>
+
+        </div>
+    `;
+}
+
+
+function renderAcademicYears() {
+
+    const years = getStoredAcademicYears();
+
+    return years.map(item => `
+
+        <div class="year-row">
+
+            <strong>
+                ${item.year}
+            </strong>
+
+            ${
+                item.active
+                ?
+                `<span style="color:#f5d477;">
+                    ACTIVE
+                </span>`
+                :
+                `<button class="admin-button"
+                         onclick="setActiveAcademicYear(${item.year})">
+                    SET ACTIVE
+                </button>`
+            }
+
+            <button class="admin-button"
+                    onclick="editAcademicYear(${item.year})">
+                EDIT
+            </button>
+
+            <button class="admin-button danger"
+                    onclick="deleteAcademicYear(${item.year})">
+                DELETE
+            </button>
+
+        </div>
+
+    `).join("");
+}
+
+
+function saveAcademicYears(years) {
+
+    localStorage.setItem(
+        "msa_academic_years",
+        JSON.stringify(years)
+    );
+}
+
+
+function addAcademicYear() {
+
+    const input =
+        document.getElementById("newAcademicYear");
+
+    const year =
+        Number(input.value);
+
+    if (!year || year < 2026) {
+
+        alert(
+            "Enter a valid year from 2026 onward."
+        );
+
+        return;
+    }
+
+    const years =
+        getStoredAcademicYears();
+
+    if (years.some(item =>
+        Number(item.year) === year
+    )) {
+
+        alert("That academic year already exists.");
+        return;
+    }
+
+    years.push({
+        year:year,
+        active:false
+    });
+
+    years.sort((a,b) =>
+        Number(a.year) - Number(b.year)
+    );
+
+    saveAcademicYears(years);
+
+    showAcademicYears();
+}
+
+
+function editAcademicYear(year) {
+
+    const newYear =
+        Number(prompt(
+            "Enter new academic year:",
+            year
+        ));
+
+    if (!newYear || newYear < 2026) {
+        alert("Invalid year.");
+        return;
+    }
+
+    const years =
+        getStoredAcademicYears();
+
+    if (years.some(item =>
+        Number(item.year) === newYear &&
+        Number(item.year) !== Number(year)
+    )) {
+
+        alert("That year already exists.");
+        return;
+    }
+
+    const item =
+        years.find(item =>
+            Number(item.year) === Number(year)
+        );
+
+    if (item) {
+        item.year = newYear;
+    }
+
+    saveAcademicYears(years);
+
+    showAcademicYears();
+}
+
+
+function setActiveAcademicYear(year) {
+
+    const years =
+        getStoredAcademicYears();
+
+    years.forEach(item => {
+        item.active =
+            Number(item.year) === Number(year);
+    });
+
+    saveAcademicYears(years);
+
+    showAcademicYears();
+}
+
+
+function deleteAcademicYear(year) {
+
+    const years =
+        getStoredAcademicYears();
+
+    if (years.length <= 1) {
+        alert(
+            "At least one academic year must remain."
+        );
+        return;
+    }
+
+    const item =
+        years.find(item =>
+            Number(item.year) === Number(year)
+        );
+
+    if (item && item.active) {
+        alert(
+            "Set another year as active first."
+        );
+        return;
+    }
+
+    if (!confirm(
+        "Delete academic year " + year + "?"
+    )) return;
+
+    const filtered =
+        years.filter(item =>
+            Number(item.year) !== Number(year)
+        );
+
+    saveAcademicYears(filtered);
+
+    showAcademicYears();
+}
+
+
+// ======================================================
+// DASHBOARD STATISTICS
+// ======================================================
+
+async function loadStats() {
+
+    let count = students.length;
+
+    try {
+
+        const response =
+            await fetch(API + "/students");
+
+        const data =
+            await response.json();
+
+        if (data.ok) {
+            students =
+                data.students || data.data || [];
+            count = students.length;
+        }
+
+    } catch(error) {}
+
+    const studentCount =
+        document.getElementById("studentCount");
+
+    const resultCount =
+        document.getElementById("resultCount");
+
+    const publishedCount =
+        document.getElementById("publishedCount");
+
+    const missingCount =
+        document.getElementById("missingCount");
+
+    if (studentCount)
+        studentCount.textContent = count;
+
+    if (resultCount)
+        resultCount.textContent = results.length;
+
+    if (publishedCount)
+        publishedCount.textContent =
+            results.filter(r => r.published).length;
+
+    if (missingCount)
+        missingCount.textContent =
+            Math.max(0, count - results.length);
+}
+
+
+// ======================================================
+// LOGOUT
+// ======================================================
+
+function logout() {
+    localStorage.removeItem(
+        "MSA_ADMIN_TOKEN"
+    );
+
+
+
+    window.location.href =
+        "/app/";
+}
+
+
+// ======================================================
+// BACK TO PORTAL
+// ======================================================
+
+function goBack() {
+
+    window.location.href =
+        "/app/";
+}
+
+
+// ======================================================
+// HTML SECURITY
+// ======================================================
+
+function escapeHtml(value) {
+
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+/* ==========================================================
+   PASSWORD / PIN RESET MANAGEMENT
+   ========================================================== */
+
+
+async function clearAllPasswordResetRecords() {
+    const confirmed = confirm(
+        "CLEAR ALL PASSWORD RESET RECORDS?\n\n" +
+        "This removes NEW REQUESTS, OLD REQUEST HISTORY, " +
+        "and NOT APPROVED ATTEMPTS.\n\n" +
+        "Active reset requests and PINs may stop working. " +
+        "This cannot be undone. Continue?"
+    );
+
+    if (!confirmed) return;
+
+    const token = localStorage.getItem("MSA_ADMIN_TOKEN");
+
+    if (!token) {
+        alert("Your administrator session has expired. Please log in again.");
+        return;
+    }
+
+    try {
+        const response = await fetch(
+            "/api/admin/password-reset-requests/clear-all",
+            {
+                method: "POST",
+                headers: {
+                    "Authorization": "Bearer " + token,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({})
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error(
+                data.message || data.error ||
+                "Unable to clear password-reset records."
+            );
+        }
+
+        alert("Password-reset requests and attempt history cleared.");
+        await loadPasswordResetRequests();
+
+    } catch (error) {
+        alert(error.message || "Unable to clear password-reset records.");
+    }
+}
+
+async function loadPasswordResetRequests() {
+
+    const newContainer =
+        document.getElementById(
+            "newPasswordResetRequests"
+        );
+
+    const oldContainer =
+        document.getElementById(
+            "oldPasswordResetRequests"
+        );
+
+    const attemptsContainer =
+        document.getElementById(
+            "failedPasswordResetAttempts"
+        );
+
+    const newIndicator =
+        document.getElementById(
+            "resetNewIndicator"
+        );
+
+    const newCountElement =
+        document.getElementById(
+            "resetNewCount"
+        );
+
+    const oldCountElement =
+        document.getElementById(
+            "resetOldCount"
+        );
+
+    const attemptCountElement =
+        document.getElementById(
+            "resetAttemptCount"
+        );
+
+    if (!newContainer ||
+        !oldContainer ||
+        !attemptsContainer) {
+
+        return;
+    }
+
+    try {
+
+        const token =
+            localStorage.getItem(
+                "MSA_ADMIN_TOKEN"
+            );
+
+        const response =
+            await fetch(
+                "/api/admin/password-reset-requests",
+                {
+                    method: "GET",
+                    headers: {
+                        "Authorization":
+                            "Bearer " + token
+                    }
+                }
+            );
+
+        const data =
+            await response.json();
+
+        if (!response.ok || !data.ok) {
+
+            throw new Error(
+                data.error ||
+                "Unable to load reset requests."
+            );
+        }
+
+        const requests =
+            Array.isArray(data.requests)
+                ? data.requests
+                : [];
+
+        const failedAttempts =
+            Array.isArray(data.failed_attempts)
+                ? data.failed_attempts
+                : [];
+
+        const newCount =
+            Number(
+                data.new_count || 0
+            );
+
+        const newRequests =
+            requests.filter(
+                request =>
+                    Number(request.is_new) === 1
+            );
+
+        const oldRequests =
+            requests.filter(
+                request =>
+                    Number(request.is_new) !== 1
+            );
+
+        if (newCountElement) {
+            newCountElement.textContent =
+                String(newCount);
+        }
+
+        if (oldCountElement) {
+            oldCountElement.textContent =
+                String(oldRequests.length);
+        }
+
+        if (attemptCountElement) {
+            attemptCountElement.textContent =
+                String(failedAttempts.length);
+        }
+
+        if (newIndicator) {
+
+            newIndicator.textContent =
+                newCount > 0
+                    ? "🔴 NEW REQUESTS: " + newCount
+                    : "🟢 NEW REQUESTS: 0";
+        }
+
+        function escapeValue(value) {
+
+            if (typeof escapeHtml === "function") {
+                return escapeHtml(
+                    String(value ?? "")
+                );
+            }
+
+            return String(value ?? "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function statusBadge(status) {
+
+            const clean =
+                String(status || "")
+                    .toLowerCase();
+
+            let className =
+                "reset-status";
+
+            if (clean === "approved") {
+                className +=
+                    " reset-status-approved";
+            } else if (
+                clean === "pending"
+            ) {
+                className +=
+                    " reset-status-pending";
+            } else {
+                className +=
+                    " reset-status-not-approved";
+            }
+
+            return `
+                <span class="${className}">
+                    ${escapeValue(
+                        String(status || "UNKNOWN")
+                            .toUpperCase()
+                    )}
+                </span>
+            `;
+        }
+
+        function formatDate(value) {
+
+            if (!value) {
+                return "—";
+            }
+
+            const date =
+                new Date(
+                    String(value)
+                        .replace(" ", "T") +
+                    "Z"
+                );
+
+            if (
+                Number.isNaN(
+                    date.getTime()
+                )
+            ) {
+                return escapeValue(value);
+            }
+
+            return escapeValue(
+                date.toLocaleString()
+            );
+        }
+
+        function requestTable(list, emptyMessage) {
+            if (!list.length) {
+                return `
+                    <div class="reset-empty reset-empty-card">
+                        <div class="reset-empty-icon">✓</div>
+                        <div>${escapeValue(emptyMessage)}</div>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="reset-card-list">
+                    ${list.map(request => {
+                        const attemptCount = Number(request.attempt_count || 0);
+                        const studentName =
+                            request.name ||
+                            request.student_name ||
+                            "Unknown";
+                        const studentId =
+                            request.student_id_code ||
+                            "NOT ASSIGNED";
+                        const form =
+                            request.form ||
+                            request.student_form ||
+                            "—";
+                        const className =
+                            request.class_name ||
+                            request.student_class_name ||
+                            "";
+
+                        return `
+                            <article class="reset-request-card">
+
+                                <div class="reset-card-top">
+
+                                    <div class="reset-student-block">
+
+                                        <div class="reset-student-avatar">
+                                            ${escapeValue(
+                                                String(studentName)
+                                                    .trim()
+                                                    .charAt(0)
+                                                    .toUpperCase() || "S"
+                                            )}
+                                        </div>
+
+                                        <div class="reset-student-info">
+
+                                            <h3>
+                                                ${escapeValue(studentName)}
+                                            </h3>
+
+                                            <div class="reset-student-meta">
+                                                <span>
+                                                    ${escapeValue(studentId)}
+                                                </span>
+
+                                                <span>•</span>
+
+                                                <span>
+                                                    Form ${escapeValue(form)}
+                                                </span>
+                                            </div>
+
+                                            ${
+                                                className
+                                                    ? `
+                                                        <div class="reset-class-name">
+                                                            ${escapeValue(className)}
+                                                        </div>
+                                                      `
+                                                    : ""
+                                            }
+
+                                        </div>
+
+                                    </div>
+
+                                    <div class="reset-status-wrap">
+                                        ${statusBadge(request.status)}
+                                    </div>
+
+                                </div>
+
+                                <div class="reset-card-stats">
+
+                                    <div class="reset-stat">
+                                        <span class="reset-stat-label">
+                                            Attempts
+                                        </span>
+
+                                        <strong>
+                                            ${attemptCount}
+                                        </strong>
+                                    </div>
+
+                                    <div class="reset-stat">
+                                        <span class="reset-stat-label">
+                                            Requested
+                                        </span>
+
+                                        <strong>
+                                            ${formatDate(request.created_at)}
+                                        </strong>
+                                    </div>
+
+                                    <div class="reset-stat">
+                                        <span class="reset-stat-label">
+                                            Last Attempt
+                                        </span>
+
+                                        <strong>
+                                            ${formatDate(request.last_attempt)}
+                                        </strong>
+                                    </div>
+
+                                </div>
+
+                                <button
+                                    type="button"
+                                    class="reset-view-button reset-view-button-card"
+                                    onclick="viewPasswordResetRequest(${Number(request.id)})"
+                                >
+                                    👁 VIEW REQUEST
+                                </button>
+
+                            </article>
+                        `;
+                    }).join("")}
+                </div>
+            `;
+        }
+
+        newContainer.innerHTML =
+            requestTable(
+                newRequests,
+                "No new password/PIN reset requests."
+            );
+
+        oldContainer.innerHTML =
+            requestTable(
+                oldRequests,
+                "No old reset requests found."
+            );
+
+        if (!failedAttempts.length) {
+
+            attemptsContainer.innerHTML = `
+                <div class="reset-empty reset-empty-card">
+
+                    <div class="reset-empty-icon">
+                        ✓
+                    </div>
+
+                    <div>
+                        No not-approved Student ID reset attempts recorded.
+                    </div>
+
+                </div>
+            `;
+
+        } else {
+
+            attemptsContainer.innerHTML = `
+
+                <div class="reset-attempt-list">
+
+                    ${failedAttempts.map(attempt => `
+
+                        <article class="reset-attempt-card">
+
+                            <div class="reset-attempt-top">
+
+                                <div>
+
+                                    <h3>
+                                        ${escapeValue(
+                                            attempt.student_name ||
+                                            "Unknown"
+                                        )}
+                                    </h3>
+
+                                    <div class="reset-attempt-time">
+                                        ${formatDate(attempt.created_at)}
+                                    </div>
+
+                                </div>
+
+                                ${statusBadge(
+                                    attempt.result ||
+                                    "not_approved"
+                                )}
+
+                            </div>
+
+                            <div class="reset-attempt-grid">
+
+                                <div class="reset-detail-item">
+
+                                    <span>
+                                        Correct Student ID
+                                    </span>
+
+                                    <strong>
+                                        ${escapeValue(
+                                            attempt.student_id_code ||
+                                            "—"
+                                        )}
+                                    </strong>
+
+                                </div>
+
+                                <div class="reset-detail-item">
+
+                                    <span>
+                                        Entered ID
+                                    </span>
+
+                                    <strong>
+                                        ${escapeValue(
+                                            attempt.entered_student_id ||
+                                            "—"
+                                        )}
+                                    </strong>
+
+                                </div>
+
+                                <div class="reset-detail-item">
+
+                                    <span>
+                                        Form
+                                    </span>
+
+                                    <strong>
+                                        ${escapeValue(
+                                            attempt.form ||
+                                            "—"
+                                        )}
+                                    </strong>
+
+                                </div>
+
+                                <div class="reset-detail-item reset-reason-item">
+
+                                    <span>
+                                        Reason
+                                    </span>
+
+                                    <strong>
+                                        ${escapeValue(
+                                            attempt.reason ||
+                                            "—"
+                                        )}
+                                    </strong>
+
+                                </div>
+
+                            </div>
+
+                        </article>
+
+                    `).join("")}
+
+                </div>
+
+            `;
+        }
+
+    } catch (error) {
+
+        console.error(
+            "Password reset request load error:",
+            error
+        );
+
+        const message =
+            `
+                <div class="reset-empty">
+                    ❌ Unable to load reset requests.
+                    <br>
+                    ${escapeValue(
+                        error.message ||
+                        "Unknown error"
+                    )}
+                </div>
+            `;
+
+        newContainer.innerHTML = message;
+        oldContainer.innerHTML = message;
+        attemptsContainer.innerHTML = message;
+    }
+}
+
+
+async function approvePasswordReset(requestId) {
+    if (!confirm(
+        "Approve this student's password/PIN reset request?"
+    )) {
+        return;
+    }
+
+    try {
+        const response =
+            await fetch(
+                API +
+                "/admin/password-reset-requests/" +
+                encodeURIComponent(requestId) +
+                "/approve",
+                {
+                    method: "POST"
+                }
+            );
+
+        const data =
+            await response.json();
+
+        if (!response.ok || !data.ok) {
+            alert(
+                data.error ||
+                "Unable to approve reset request."
+            );
+            return;
+        }
+
+        alert(
+            "Reset request approved. " +
+            "The student can now receive the temporary PIN."
+        );
+
+        loadPasswordResetRequests();
+
+    } catch (error) {
+        alert(
+            "Connection error while approving request."
+        );
+    }
+}
+
+
+async function rejectPasswordReset(requestId) {
+    if (!confirm(
+        "Reject this student's password/PIN reset request?"
+    )) {
+        return;
+    }
+
+    try {
+        const response =
+            await fetch(
+                API +
+                "/admin/password-reset-requests/" +
+                encodeURIComponent(requestId) +
+                "/reject",
+                {
+                    method: "POST"
+                }
+            );
+
+        const data =
+            await response.json();
+
+        if (!response.ok || !data.ok) {
+            alert(
+                data.error ||
+                "Unable to reject reset request."
+            );
+            return;
+        }
+
+        loadPasswordResetRequests();
+
+    } catch (error) {
+        alert(
+            "Connection error while rejecting request."
+        );
+    }
+}
+
+
+function createPasswordResetPanel() {
+
+    if (document.getElementById("passwordResetPanel")) {
+        return;
+    }
+
+    if (document.getElementById("loginPage")) {
+        return;
+    }
+
+    const panel = document.createElement("section");
+
+    panel.id = "passwordResetPanel";
+    panel.style.display = "none";
+
+    panel.className = "password-reset-admin-panel";
+
+    panel.innerHTML = `
+        <div>
+
+            <div style="
+                display:flex;
+                justify-content:space-between;
+                align-items:center;
+                gap:15px;
+                flex-wrap:wrap;
+            ">
+
+                <div>
+                    <h2 style="margin:0 0 6px;">
+                        🔐 PASSWORD / PIN RESET
+                    </h2>
+
+                    <p style="
+                        margin:0;
+                        opacity:.8;
+                    ">
+                        Student password and PIN recovery requests
+                    </p>
+                </div>
+
+                <div style="
+                    display:flex;
+                    gap:10px;
+                    flex-wrap:wrap;
+                ">
+
+                    <span
+                        id="resetNewIndicator"
+                        style="
+                            display:inline-flex;
+                            align-items:center;
+                            padding:10px 14px;
+                            border-radius:999px;
+                            background:#07111f;
+                            color:#fff;
+                            font-weight:800;
+                        "
+                    >
+                        🔴 0 NEW REQUESTS
+                    </span>
+
+                    <button
+                        type="button"
+                        onclick="loadPasswordResetRequests()"
+                        style="
+                            border:0;
+                            border-radius:10px;
+                            padding:10px 16px;
+                            font-weight:800;
+                            cursor:pointer;
+                        "
+                     onclick="loadPasswordResetRequests()">
+                        🔄 REFRESH REQUESTS
+                    </button>
+
+                </div>
+
+            </div>
+
+            <div id="passwordResetRequests"
+                style="margin-top:20px;">
+                Loading reset requests...
+            </div>
+
+        </div>
+    `;
+    loadPasswordResetRequests();
+if (window.passwordResetRefresh) {
+        clearInterval(window.passwordResetRefresh);
+    }
+
+    window.passwordResetRefresh =
+        setInterval(
+            loadPasswordResetRequests,
+            15000
+        );
+}
+
+
+
+
+
+
+
+
+
+/* STATUS CLICK INTERCEPTOR REMOVED */
+
+
+async function toggleStudentStatus(id) {
+    const student = students.find(
+        s => Number(s.id) === Number(id)
+    );
+
+    if (!student) {
+        alert("Student not found.");
+        return;
+    }
+
+    const current =
+        String(student.status || "Active").toLowerCase();
+
+    const newStatus =
+        current === "active" ? "Disabled" : "Active";
+
+    const action =
+        newStatus === "Disabled"
+            ? "DISABLE"
+            : "ACTIVATE";
+
+    if (!confirm(
+        action + " account for " +
+        student.name +
+        "?\n\n" +
+        "New status: " +
+        newStatus
+    )) {
+        return;
+    }
+
+    try {
+        const response = await fetch(
+            API + "/students/toggle-status",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    student_id: Number(student.id)
+                })
+            }
+        );
+
+        const data = await response.json();
+
+        console.log(
+            "Student status API response:",
+            data
+        );
+
+        if (!response.ok || !data.ok) {
+            alert(
+                data.message ||
+                "Unable to change student status."
+            );
+            return;
+        }
+
+        alert(
+            "Account status changed to " +
+            data.status +
+            "."
+        );
+
+        await loadStudents();
+
+    } catch (error) {
+        console.error(
+            "Student status error:",
+            error
+        );
+
+        alert(
+            "Connection error while changing student status."
+        );
+    }
+}
+
+
+
+
+
+
+
+
+
+
+/* ============================================================
+   MSA PERMANENT STUDENT ID DISPLAY
+   ============================================================ */
+(function() {
+    function decorateStudentIds() {
+        const container =
+            document.getElementById("studentsList");
+
+        if (!container || !Array.isArray(window.students)) {
+            return;
+        }
+
+        const cards =
+            container.querySelectorAll(".student-card");
+
+        cards.forEach(function(card) {
+            if (card.querySelector(".msa-student-id-badge")) {
+                return;
+            }
+
+            const text =
+                card.textContent
+                    .replace(/\s+/g, " ")
+                    .trim();
+
+            const student =
+                window.students.find(function(item) {
+                    return text.indexOf(
+                        String(item.name || "")
+                    ) !== -1;
+                });
+
+            if (!student || !student.student_id_code) {
+                return;
+            }
+
+            const badge =
+                document.createElement("div");
+
+            badge.className =
+                "msa-student-id-badge";
+
+            badge.textContent =
+                "Student ID: " +
+                student.student_id_code;
+
+            badge.style.cssText =
+                "margin-top:6px;" +
+                "font-weight:800;" +
+                "letter-spacing:.4px;";
+
+            const info =
+                card.querySelector(".student-info") ||
+                card;
+
+            info.appendChild(badge);
+        });
+    }
+
+    const originalLoadStudents =
+        window.loadStudents;
+
+    if (typeof originalLoadStudents === "function") {
+        window.loadStudents = async function() {
+            const result =
+                await originalLoadStudents.apply(
+                    this,
+                    arguments
+                );
+
+            setTimeout(
+                decorateStudentIds,
+                50
+            );
+
+            return result;
+        };
+    }
+
+    const originalRenderStudents =
+        window.renderStudents;
+
+    if (typeof originalRenderStudents === "function") {
+        window.renderStudents = function() {
+            const result =
+                originalRenderStudents.apply(
+                    this,
+                    arguments
+                );
+
+            setTimeout(
+                decorateStudentIds,
+                20
+            );
+
+            return result;
+        };
+    }
+
+    setTimeout(
+        decorateStudentIds,
+        500
+    );
+})();
+
+async function viewPasswordResetRequest(requestId) {
+
+    try {
+
+        const token =
+            localStorage.getItem(
+                "MSA_ADMIN_TOKEN"
+            );
+
+        const response =
+            await fetch(
+                "/api/admin/password-reset-requests",
+                {
+                    method: "GET",
+                    headers: {
+                        "Authorization":
+                            "Bearer " + token
+                    }
+                }
+            );
+
+        const data =
+            await response.json();
+
+        if (!response.ok || !data.ok) {
+            throw new Error(
+                data.error ||
+                "Unable to load request details."
+            );
+        }
+
+        const requests =
+            Array.isArray(data.requests)
+                ? data.requests
+                : [];
+
+        const request =
+            requests.find(
+                item =>
+                    Number(item.id) ===
+                    Number(requestId)
+            );
+
+        if (!request) {
+
+            alert(
+                "This reset request could not be found."
+            );
+
+            return;
+        }
+
+        function safe(value) {
+
+            if (typeof escapeHtml === "function") {
+                return escapeHtml(
+                    String(value ?? "—")
+                );
+            }
+
+            return String(value ?? "—")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        const details = [
+
+            "PASSWORD / PIN RESET REQUEST",
+            "",
+            "Student: " +
+                (
+                    request.name ||
+                    request.student_name ||
+                    "Unknown"
+                ),
+
+            "Student ID: " +
+                (
+                    request.student_id_code ||
+                    "NOT ASSIGNED"
+                ),
+
+            "Form: " +
+                (
+                    request.form ||
+                    request.student_form ||
+                    "—"
+                ),
+
+            "Class: " +
+                (
+                    request.class_name ||
+                    request.student_class_name ||
+                    "—"
+                ),
+
+            "Status: " +
+                (
+                    request.status ||
+                    "UNKNOWN"
+                ).toUpperCase(),
+
+            "Attempts: " +
+                (
+                    request.attempt_count ||
+                    0
+                ),
+
+            "Requested: " +
+                (
+                    request.created_at ||
+                    "—"
+                ),
+
+            "Last attempt: " +
+                (
+                    request.last_attempt ||
+                    "—"
+                ),
+
+            "Approved: " +
+                (
+                    request.approved_at ||
+                    "—"
+                ),
+
+            "Expires: " +
+                (
+                    request.expires_at ||
+                    "—"
+                ),
+
+            "Used: " +
+                (
+                    request.used_at ||
+                    "—"
+                )
+        ].join("\n");
+
+        alert(details);
+
+        /*
+         * Mark a NEW request as seen.
+         * Failure here must not break the reset system.
+         */
+
+        if (
+            Number(request.is_new) === 1
+        ) {
+
+            try {
+
+                await fetch(
+                    "/api/admin/password-reset-requests/" +
+                    encodeURIComponent(
+                        request.id
+                    ) +
+                    "/seen",
+                    {
+                        method: "POST",
+                        headers: {
+                            "Authorization":
+                                "Bearer " + token,
+                            "Content-Type":
+                                "application/json"
+                        },
+                        body: "{}"
+                    }
+                );
+
+            } catch (seenError) {
+
+                console.warn(
+                    "Unable to mark request as seen:",
+                    seenError
+                );
+            }
+
+            await loadPasswordResetRequests();
+        }
+
+    } catch (error) {
+
+        console.error(
+            "Reset request view error:",
+            error
+        );
+
+        alert(
+            "Unable to open this reset request.\n\n" +
+            (
+                error.message ||
+                "Unknown error"
+            )
+        );
+    }
+}
+
+/* =========================================================
+   MSA PORTAL — MAIN ADMIN MANAGEMENT PANEL
+   Main Admin: Weston Mwashita
+   ========================================================= */
+
+
+/* =========================================================
+   DASHBOARD SECTION SCREENS
+   ========================================================= */
+
+function showAdminSectionScreen(title, subtitle, content) {
+    const dashboardMain = document.querySelector("main");
+
+    if (!dashboardMain) {
+        alert("Dashboard container not found.");
+        return;
+    }
+
+    dashboardMain.innerHTML = `
+        <section class="admin-section-screen">
+
+            <div class="admin-section-header">
+                <div>
+                    <h2>${title}</h2>
+                    <p>${subtitle}</p>
+                </div>
+            </div>
+
+            <div class="admin-section-content">
+                ${content}
+            </div>
+
+            <button
+                type="button"
+                class="admin-section-back-button"
+                onclick="showDashboard()">
+                ← BACK TO DASHBOARD
+            </button>
+
+        </section>
+    `;
+
+    window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+    });
+}
+
+
+/* ---------------------------------------------------------
+   STUDENT MANAGEMENT
+   --------------------------------------------------------- */
+
+function showStudentManagementScreen() {
+    showAdminSectionScreen(
+        "👨‍🎓 STUDENT MANAGEMENT",
+        "Manage student accounts and student information.",
+        `
+            <div class="section-action-grid">
+
+                <button
+                    type="button"
+                    class="section-action-card"
+                    onclick="showAddStudent()">
+                    <span>👨‍🎓</span>
+                    <strong>Add Student</strong>
+                    <small>Create a new student account</small>
+                </button>
+
+                <button
+                    type="button"
+                    class="section-action-card"
+                    onclick="showStudents()">
+                    <span>📋</span>
+                    <strong>Students</strong>
+                    <small>View and manage students</small>
+                </button>
+
+            </div>
+
+            <div id="adminContent"></div>
+        `
+    );
+}
+
+
+/* ---------------------------------------------------------
+   PASSWORD / PIN RESET
+   --------------------------------------------------------- */
+
+function showPasswordResetScreen() {
+    const dashboardMain = document.querySelector("main");
+
+    if (!dashboardMain) {
+        alert("Dashboard container not found.");
+        return;
+    }
+
+    dashboardMain.innerHTML = `
+        <section class="admin-section-screen">
+            <div class="admin-section-content">
+                <div id="adminContent"></div>
+            </div>
+        </section>
+    `;
+
+    addPasswordPinResetEntry();
+
+    window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+    });
+}
+
+
+/* ---------------------------------------------------------
+   RESULTS MANAGEMENT
+   --------------------------------------------------------- */
+
+function showResultsManagementScreen() {
+    showAdminSectionScreen(
+        "📄 RESULTS MANAGEMENT",
+        "Upload, review and publish student examination results.",
+        `
+            <div class="section-action-grid">
+
+                <button
+                    type="button"
+                    class="section-action-card"
+                    onclick="showUploadResults()">
+                    <span>📄</span>
+                    <strong>Upload Results</strong>
+                    <small>Add examination results</small>
+                </button>
+
+                <button
+                    type="button"
+                    class="section-action-card"
+                    onclick="showResultStatus()">
+                    <span>📊</span>
+                    <strong>Result Status</strong>
+                    <small>Check uploaded results</small>
+                </button>
+
+                <button
+                    type="button"
+                    class="section-action-card"
+                    onclick="showPublishResults()">
+                    <span>📢</span>
+                    <strong>Publish Results</strong>
+                    <small>Make results available</small>
+                </button>
+
+            </div>
+
+            <div id="adminContent"></div>
+        `
+    );
+}
+
+
+/* ---------------------------------------------------------
+   ACADEMIC MANAGEMENT
+   --------------------------------------------------------- */
+
+function showAcademicManagementScreen() {
+    showAdminSectionScreen(
+        "📅 ACADEMIC MANAGEMENT",
+        "Manage academic years and school academic settings.",
+        `
+            <div class="section-action-grid">
+
+                <button
+                    type="button"
+                    class="section-action-card"
+                    onclick="showAcademicYears()">
+                    <span>📅</span>
+                    <strong>Academic Years</strong>
+                    <small>Manage academic years</small>
+                </button>
+
+            </div>
+
+            <div id="adminContent"></div>
+        `
+    );
+}
+
+
+async function showMainAdminPanel() {
+    const token = localStorage.getItem("MSA_ADMIN_TOKEN");
+
+    if (!token) {
+        alert("Administrator login required.");
+        return;
+    }
+
+    let response;
+
+    try {
+        response = await fetch("/api/admin/users", {
+            method: "GET",
+            headers: {
+                "Authorization": "Bearer " + token
+            }
+        });
+    } catch (error) {
+        alert("Unable to connect to the server.");
+        return;
+    }
+
+    const data = await response.json();
+
+    if (!response.ok || !data.ok) {
+        alert(data.message || data.error || "Main Admin access required.");
+        return;
+    }
+
+    /*
+     * Main Administrator opens as its own dashboard screen.
+     */
+
+    const dashboardMain = document.querySelector("main");
+
+    if (!dashboardMain) {
+        alert("Dashboard container not found.");
+        return;
+    }
+
+    dashboardMain.innerHTML = "";
+
+    const panel = document.createElement("section");
+
+    panel.id = "mainAdminPanel";
+    panel.className = "main-admin-panel";
+
+    const admins = Array.isArray(data.admins) ? data.admins : [];
+
+    panel.innerHTML = `
+        <div class="main-admin-card">
+
+            <h2>👑 MAIN ADMINISTRATOR</h2>
+
+            <p>
+                <strong>Weston Mwashita</strong>
+                — Administrator Management
+            </p>
+
+            <div class="main-admin-info">
+                Manage administrator accounts, names, usernames,
+                passwords and account status.
+            </div>
+
+            <div id="mainAdminUsers">
+
+                ${
+                    admins.map(admin => {
+
+                        const isMain =
+                            admin.role === "main_admin";
+
+                        const active =
+                            Number(admin.active) === 1;
+
+                        return `
+                            <div class="main-admin-card ${isMain ? "main-admin" : ""}">
+
+                                <h3>
+                                    ${isMain ? "👑 " : "👤 "}
+                                    ${escapeHtml(admin.display_name || admin.username)}
+                                </h3>
+
+                                <p>
+                                    <strong>Username:</strong>
+                                    ${escapeHtml(admin.username)}
+                                </p>
+
+                                <p>
+                                    <strong>Role:</strong>
+                                    ${escapeHtml(admin.role)}
+                                </p>
+
+                                <p>
+                                    <strong>Status:</strong>
+
+                                    <span class="main-admin-status ${active ? "active" : "disabled"}">
+                                        ${active ? "ACTIVE" : "DISABLED"}
+                                    </span>
+                                </p>
+
+                                <p>
+                                    <strong>Last Login:</strong>
+                                    ${escapeHtml(admin.last_login_at || "Never")}
+                                </p>
+
+                                ${isMain
+                                    ? `
+                                        <div class="main-admin-actions">
+
+                                            <div class="main-admin-protected">
+                                                👑 MAIN ADMINISTRATOR
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                onclick="mainAdminEdit(${Number(admin.id)})">
+                                                EDIT
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onclick="mainAdminChangePassword(${Number(admin.id)})"
+                                                class="password-button">
+                                                CHANGE PASSWORD
+                                            </button>
+
+                                        </div>
+                                    `
+                                    : `
+                                        <div class="main-admin-actions">
+
+                                            <button
+                                                type="button"
+                                                onclick="mainAdminToggle(${Number(admin.id)}, ${active})"
+                                                class="${active ? "disable-button" : "enable-button"}">
+                                                ${active ? "DISABLE" : "ENABLE"}
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onclick="mainAdminEdit(${Number(admin.id)})">
+                                                EDIT
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onclick="mainAdminChangePassword(${Number(admin.id)})"
+                                                class="password-button">
+                                                CHANGE PASSWORD
+                                            </button>
+
+                                        </div>
+                                    `
+                                }
+
+                            </div>
+                        `;
+                    }).join("")
+                }
+
+            </div>
+
+            <div class="main-admin-screen-actions">
+
+                <button
+                    type="button"
+                    onclick="showMainAdminPanel()">
+                    🔄 REFRESH ADMINISTRATORS
+                </button>
+
+                <button
+                    type="button"
+                    onclick="showDashboard()"
+                    class="main-admin-back-button">
+                    ← BACK TO DASHBOARD
+                </button>
+
+            </div>
+
+        </div>
+    `;
+
+    const dashboard =
+        document.querySelector(".dashboard") ||
+        document.querySelector("#dashboard") ||
+        document.body;
+
+    /*
+     * Keep Main Administrator inside the existing dashboard
+     * without forcing the user's screen to jump.
+     */
+    dashboardMain.appendChild(panel);
+
+    window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+    });
+}
+
+
+async function mainAdminToggle(id, currentlyActive) {
+
+    const token = localStorage.getItem("MSA_ADMIN_TOKEN");
+
+    if (!token) {
+        alert("Administrator login required.");
+        return;
+    }
+
+    const action =
+        currentlyActive
+        ? "disable"
+        : "enable";
+
+    if (!confirm(
+        currentlyActive
+        ? "Disable this administrator account?"
+        : "Enable this administrator account?"
+    )) {
+        return;
+    }
+
+    try {
+
+        const response = await fetch(
+            "/api/admin/users/" + id + "/" + action,
+            {
+                method: "POST",
+                headers: {
+                    "Authorization": "Bearer " + token,
+                    "Content-Type": "application/json"
+                }
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            alert(data.message || data.error || "Unable to update administrator.");
+            return;
+        }
+
+        alert(data.message || "Administrator updated.");
+
+        await showMainAdminPanel();
+
+    } catch (error) {
+        alert("Unable to connect to the server.");
+    }
+}
+
+
+async function mainAdminEdit(id) {
+    const token = localStorage.getItem("MSA_ADMIN_TOKEN");
+
+    if (!token) {
+        alert("Administrator login required.");
+        return;
+    }
+
+    const username = prompt(
+        "Enter the new administrator username:"
+    );
+
+    if (username === null) {
+        return;
+    }
+
+    const cleanUsername = username.trim();
+
+    if (!cleanUsername) {
+        alert("Username cannot be empty.");
+        return;
+    }
+
+    const displayName = prompt(
+        "Enter the new administrator display name:"
+    );
+
+    if (displayName === null) {
+        return;
+    }
+
+    const cleanDisplayName = displayName.trim();
+
+    if (!cleanDisplayName) {
+        alert("Display name cannot be empty.");
+        return;
+    }
+
+    try {
+        const response = await fetch(
+            "/api/admin/users/" + id,
+            {
+                method: "PUT",
+                headers: {
+                    "Authorization": "Bearer " + token,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    username: cleanUsername,
+                    display_name: cleanDisplayName
+                })
+            }
+        );
+
+        let data = {};
+
+        try {
+            data = await response.json();
+        } catch (jsonError) {
+            data = {};
+        }
+
+        if (!response.ok || !data.ok) {
+            alert(
+                data.message ||
+                data.error ||
+                "Unable to update administrator."
+            );
+            return;
+        }
+
+        alert(
+            data.message ||
+            "Administrator updated successfully."
+        );
+
+        await showMainAdminPanel();
+
+    } catch (error) {
+        console.error("MAIN ADMIN EDIT ERROR:", error);
+        alert("Unable to connect to the server.");
+    }
+}
+
+async function mainAdminChangePassword(id) {
+
+    const token = localStorage.getItem("MSA_ADMIN_TOKEN");
+
+    if (!token) {
+        alert("Administrator login required.");
+        return;
+    }
+
+    const password =
+        prompt("Enter the new password:");
+
+    if (password === null) {
+        return;
+    }
+
+    if (password.length < 8) {
+        alert("Password must contain at least 8 characters.");
+        return;
+    }
+
+    const confirmPassword =
+        prompt("Confirm the new password:");
+
+    if (confirmPassword === null) {
+        return;
+    }
+
+    if (password !== confirmPassword) {
+        alert("Passwords do not match.");
+        return;
+    }
+
+    try {
+
+        const response = await fetch(
+            "/api/admin/users/" + id + "/password",
+            {
+                method: "POST",
+                headers: {
+                    "Authorization": "Bearer " + token,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    password: password
+                })
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+            alert(data.message || data.error || "Unable to change password.");
+            return;
+        }
+
+        alert(data.message || "Password changed successfully.");
+
+        await showMainAdminPanel();
+
+    } catch (error) {
+        alert("Unable to connect to the server.");
+    }
+}
+
+
+/* Make the function available to the existing dashboard buttons. */
+window.showMainAdminPanel = showMainAdminPanel;
+window.mainAdminToggle = mainAdminToggle;
+window.mainAdminEdit = mainAdminEdit;
+window.mainAdminChangePassword = mainAdminChangePassword;
+

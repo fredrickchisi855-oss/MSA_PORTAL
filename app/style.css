@@ -1,0 +1,1370 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: Arial, Helvetica, sans-serif;
+    min-height: 100vh;
+    background: linear-gradient(145deg, #07111f, #0d1b2e, #132943);
+    color: #ffffff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+.portal {
+    width: 100%;
+    max-width: 430px;
+    min-height: 650px;
+    background: rgba(13, 27, 46, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 28px;
+    padding: 38px 25px 25px;
+    box-shadow: 0 25px 70px rgba(0, 0, 0, 0.45);
+    display: flex;
+    flex-direction: column;
+}
+
+.welcome {
+    text-align: center;
+}
+
+.logo {
+    width: 92px;
+    height: 92px;
+    margin: 0 auto 20px;
+    border-radius: 24px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: linear-gradient(145deg, #1677ff, #00a8ff);
+    font-size: 28px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    box-shadow: 0 12px 35px rgba(0, 150, 255, 0.3);
+}
+
+h1 {
+    font-size: 30px;
+    letter-spacing: 2px;
+    font-weight: 800;
+}
+
+.subtitle {
+    margin-top: 8px;
+    font-size: 12px;
+    letter-spacing: 3px;
+    color: #8fb7dd;
+}
+
+.divider {
+    width: 55px;
+    height: 4px;
+    margin: 22px auto;
+    border-radius: 10px;
+    background: #1688ff;
+}
+
+.welcome-text {
+    color: #a9bbce;
+    line-height: 1.6;
+    font-size: 14px;
+    max-width: 320px;
+    margin: auto;
+}
+
+.user-section,
+.admin-section {
+    margin-top: 35px;
+    text-align: center;
+}
+
+h2 {
+    font-size: 14px;
+    letter-spacing: 2px;
+    margin-bottom: 14px;
+    color: #d9e8f7;
+}
+
+button {
+    width: 100%;
+    border: none;
+    border-radius: 15px;
+    padding: 17px;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.primary-button {
+    color: white;
+    background: linear-gradient(135deg, #1677ff, #00a8ff);
+    box-shadow: 0 10px 25px rgba(0, 130, 255, 0.25);
+}
+
+.secondary-button {
+    color: #d9e8f7;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+button:active {
+    transform: scale(0.97);
+}
+
+footer {
+    margin-top: auto;
+    padding-top: 35px;
+    text-align: center;
+    color: #60758b;
+    font-size: 11px;
+}
+
+footer p {
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: #8aa0b6;
+    margin-bottom: 5px;
+}
+
+footer span {
+    letter-spacing: 1px;
+}
+
+@media (max-height: 700px) {
+    .portal {
+        min-height: auto;
+    }
+
+    .user-section,
+    .admin-section {
+        margin-top: 25px;
+    }
+
+    footer {
+        margin-top: 30px;
+    }
+}
+
+/* FORM SELECTION */
+
+.page {
+    text-align: center;
+    width: 100%;
+}
+
+.back-button {
+    width: auto;
+    display: block;
+    padding: 8px 14px;
+    margin-bottom: 25px;
+    background: transparent;
+    color: #8fb7dd;
+    border: none;
+    font-size: 13px;
+    font-weight: 700;
+    text-align: left;
+}
+
+.page-icon {
+    font-size: 42px;
+    margin-bottom: 15px;
+}
+
+.page h1 {
+    font-size: 26px;
+    margin-bottom: 8px;
+}
+
+.page-subtitle {
+    color: #8fb7dd;
+    font-size: 12px;
+    letter-spacing: 2px;
+    margin-bottom: 25px;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    width: 100%;
+}
+
+.form-button {
+    min-height: 115px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(22, 136, 255, 0.35);
+    border-radius: 18px;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.form-button span {
+    font-size: 12px;
+    color: #8fb7dd;
+    letter-spacing: 2px;
+}
+
+.form-button strong {
+    font-size: 34px;
+    margin-top: 5px;
+}
+
+.form-button:active {
+    background: rgba(22, 119, 255, 0.25);
+    transform: scale(0.97);
+}
+
+.info-box {
+    margin-top: 25px;
+    padding: 17px;
+    border-radius: 15px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    text-align: left;
+}
+
+.info-box strong {
+    display: block;
+    margin-bottom: 7px;
+    color: #ffffff;
+}
+
+.info-box p {
+    color: #8fa4b8;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.search-box {
+    width: 100%;
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.search-box input {
+    flex: 1;
+    min-width: 0;
+    padding: 15px;
+    border-radius: 13px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.06);
+    color: white;
+    outline: none;
+}
+
+.search-box button {
+    width: auto;
+    padding: 15px;
+    background: #1677ff;
+    color: white;
+}
+
+.empty-state {
+    padding: 35px 10px;
+    color: #71879c;
+    text-align: center;
+}
+
+.empty-state div {
+    font-size: 30px;
+    margin-bottom: 10px;
+}
+
+.student-results {
+    width: 100%;
+}
+
+.student-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+    padding: 13px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: white;
+    text-align: left;
+}
+
+.student-avatar {
+    width: 45px;
+    height: 45px;
+    min-width: 45px;
+    border-radius: 50%;
+    background: #1677ff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: 800;
+    font-size: 18px;
+}
+
+.student-avatar.large {
+    width: 70px;
+    height: 70px;
+    margin: 0 auto 12px;
+    font-size: 25px;
+}
+
+.student-info {
+    flex: 1;
+}
+
+.student-info strong {
+    display: block;
+    font-size: 14px;
+}
+
+.student-info span {
+    display: block;
+    margin-top: 4px;
+    color: #8198ad;
+    font-size: 11px;
+}
+
+.student-arrow {
+    font-size: 22px;
+    color: #5e9ee8;
+}
+
+.selected-student {
+    padding: 20px;
+    margin-bottom: 25px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.selected-student strong {
+    display: block;
+    font-size: 18px;
+}
+
+.selected-student span {
+    display: block;
+    color: #8198ad;
+    font-size: 12px;
+    margin-top: 5px;
+}
+
+.password-input {
+    width: 100%;
+    padding: 17px;
+    margin-bottom: 15px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.06);
+    color: white;
+    font-size: 15px;
+    text-align: center;
+    outline: none;
+}
+
+.security-note {
+    margin-top: 15px;
+    color: #687f95;
+    font-size: 11px;
+}
+
+/* =========================================
+   RESULT DOWNLOAD BUTTON
+   ========================================= */
+
+.result-download {
+    margin-top: 14px;
+    margin-bottom: 8px;
+}
+
+.download-result-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 12px 16px;
+    border-radius: 8px;
+    background: #198754;
+    color: #ffffff !important;
+    text-decoration: none !important;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+
+.download-result-btn:hover {
+    background: #157347;
+    transform: translateY(-1px);
+}
+
+.download-result-btn:active {
+    transform: translateY(0);
+}
+
+@media (max-width: 600px) {
+    .download-result-btn {
+        padding: 13px 14px;
+        font-size: 13px;
+    }
+}
+
+
+/* =========================================
+   PROFESSIONAL RESULT HISTORY
+   ========================================= */
+
+.results-history {
+    width: 100%;
+    margin-top: 18px;
+}
+
+.history-year {
+    margin-bottom: 24px;
+    background: #ffffff;
+    border: 1px solid #e4e8ee;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+
+.history-year > h2 {
+    margin: 0;
+    padding: 14px 18px;
+    background: #f4f7fb;
+    border-bottom: 1px solid #e4e8ee;
+    color: #1f2937;
+    font-size: 20px;
+    font-weight: 800;
+}
+
+.history-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 18px;
+    border-bottom: 1px solid #edf0f4;
+    background: #ffffff;
+}
+
+.history-item:last-child {
+    border-bottom: none;
+}
+
+.history-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.history-info strong {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 10px;
+    margin-bottom: 8px;
+    border-radius: 20px;
+    background: #e8f1ff;
+    color: #1557a6;
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.history-info > span {
+    display: block;
+    color: #374151;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.5;
+    word-break: break-word;
+}
+
+.history-view {
+    flex-shrink: 0;
+    border: none;
+    border-radius: 8px;
+    padding: 11px 18px;
+    background: #1557a6;
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+
+.history-view:hover {
+    background: #0f4382;
+    transform: translateY(-1px);
+}
+
+.history-view:active {
+    transform: translateY(0);
+}
+
+.history-item .result-download {
+    margin-top: 12px;
+}
+
+.history-item .download-result-btn {
+    width: auto;
+    min-width: 170px;
+    padding: 10px 14px;
+    font-size: 12px;
+}
+
+@media (max-width: 600px) {
+
+    .history-year {
+        border-radius: 12px;
+        margin-bottom: 18px;
+    }
+
+    .history-year > h2 {
+        padding: 13px 15px;
+        font-size: 18px;
+    }
+
+    .history-item {
+        display: block;
+        padding: 15px;
+    }
+
+    .history-info > span {
+        font-size: 13px;
+    }
+
+    .history-view {
+        width: 100%;
+        margin-top: 12px;
+    }
+
+    .history-item .download-result-btn {
+        width: 100%;
+        min-width: 0;
+    }
+}
+
+
+/* =========================================
+   RESULT HISTORY - FINAL POLISH
+   ========================================= */
+
+.history-year-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 18px;
+    background: linear-gradient(135deg, #f4f7fb, #eaf0f8);
+    border-bottom: 1px solid #e1e7ef;
+}
+
+.history-year-label {
+    display: block;
+    margin-bottom: 3px;
+    color: #6b7280;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 1px;
+}
+
+.history-year-header h2 {
+    margin: 0;
+    color: #1557a6;
+    font-size: 24px;
+    font-weight: 900;
+}
+
+.history-year-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 1px solid #dce4ee;
+    font-size: 20px;
+}
+
+.history-year-results {
+    width: 100%;
+}
+
+.history-term-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+
+.history-term-row strong {
+    margin: 0;
+}
+
+.history-published {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 20px;
+    background: #e9f8ef;
+    color: #198754;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.4px;
+}
+
+.history-result-name {
+    display: block;
+    color: #374151;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.5;
+    word-break: break-word;
+}
+
+@media (max-width: 600px) {
+
+    .history-year-header {
+        padding: 14px 15px;
+    }
+
+    .history-year-header h2 {
+        font-size: 21px;
+    }
+
+    .history-year-icon {
+        width: 38px;
+        height: 38px;
+        font-size: 18px;
+    }
+
+    .history-term-row {
+        gap: 7px;
+    }
+
+    .history-published {
+        font-size: 9px;
+    }
+
+    .history-result-name {
+        font-size: 13px;
+    }
+}
+
+
+/* ==========================================================
+   PASSWORD / PIN RECOVERY
+   ========================================================== */
+
+.forgot-password-button {
+    width: 100%;
+    margin-top: 12px;
+    padding: 13px 18px;
+    border: 1px solid #d8e0ea;
+    border-radius: 12px;
+    background: transparent;
+    color: #71849d;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.forgot-password-button:hover {
+    background: #f5f7fa;
+}
+
+.reset-info-box,
+.temporary-pin-box {
+    margin: 18px 0;
+    padding: 20px;
+    border-radius: 16px;
+    background: #f5f8fc;
+    border: 1px solid #e1e7ef;
+    text-align: center;
+}
+
+.reset-info-box h3,
+.temporary-pin-box h3 {
+    margin-top: 0;
+    color: #17233c;
+}
+
+.reset-info-box p,
+.temporary-pin-box p {
+    color: #71849d;
+    line-height: 1.6;
+}
+
+.reset-success {
+    margin-top: 18px;
+    padding: 20px;
+    border-radius: 16px;
+    background: #eefaf3;
+    border: 1px solid #cfeedd;
+    text-align: center;
+}
+
+.reset-error {
+    margin-top: 18px;
+    padding: 16px;
+    border-radius: 14px;
+    background: #fff0f1;
+    border: 1px solid #f3c8cd;
+    color: #a32939;
+    text-align: center;
+}
+
+.reset-success-icon {
+    width: 44px;
+    height: 44px;
+    margin: 0 auto 12px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #168a55;
+    color: #ffffff;
+    font-size: 24px;
+    font-weight: 800;
+}
+
+.temporary-pin {
+    margin: 16px auto;
+    padding: 16px;
+    width: fit-content;
+    min-width: 150px;
+    border-radius: 14px;
+    background: #17233c;
+    color: #ffffff;
+    font-size: 34px;
+    font-weight: 900;
+    letter-spacing: 8px;
+}
+
+.pin-warning {
+    font-weight: 700;
+}
+
+.pin-countdown {
+    margin-top: 15px;
+    color: #71849d;
+}
+
+.pin-countdown strong {
+    color: #c43c4b;
+}
+
+.credential-option {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px;
+    margin: 10px 0;
+    border: 1px solid #dce3ec;
+    border-radius: 12px;
+    cursor: pointer;
+}
+
+.credential-option input {
+    width: 18px;
+    height: 18px;
+}
+
+.credential-option span {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.credential-option small {
+    color: #71849d;
+}
+
+
+/* =========================================================
+   MSA PORTAL — RESULT ACTION BUTTONS
+   Keep VIEW and DOWNLOAD together
+   ========================================================= */
+
+.history-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.history-info {
+    flex: 1;
+    min-width: 220px;
+}
+
+.history-view,
+.download-result-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 42px;
+    padding: 10px 16px;
+    border-radius: 10px;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 13px;
+    line-height: 1;
+    white-space: nowrap;
+    box-sizing: border-box;
+}
+
+.history-view {
+    margin: 0;
+}
+
+.result-download {
+    display: inline-flex;
+    align-items: center;
+    margin-top: 12px;
+}
+
+.history-item .history-view,
+.history-item .result-download {
+    flex-shrink: 0;
+}
+
+/* Put VIEW + DOWNLOAD side by side */
+.history-item {
+    position: relative;
+}
+
+@media (min-width: 600px) {
+    .history-item {
+        flex-wrap: nowrap;
+    }
+
+    .history-item .history-info {
+        min-width: 0;
+    }
+
+    .history-item .result-download {
+        margin-top: 0;
+    }
+}
+
+/* Phone layout */
+@media (max-width: 599px) {
+    .history-item {
+        align-items: stretch;
+    }
+
+    .history-item .history-info {
+        width: 100%;
+    }
+
+    .history-item .result-download {
+        width: 100%;
+        margin-top: 10px;
+    }
+
+    .history-item .download-result-btn,
+    .history-item .history-view {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .history-item .history-view {
+        margin-top: 10px;
+    }
+}
+
+/* Shared professional button sizing */
+.history-item .history-view,
+.history-item .download-result-btn {
+    min-width: 125px;
+}
+
+
+
+/* ============================================================
+   MSA PORTAL PROFESSIONAL WELCOME SCREEN
+   ============================================================ */
+
+.msa-welcome-screen {
+    position: relative;
+    min-height: 72vh;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 28px 18px;
+    box-sizing: border-box;
+    overflow: hidden;
+    animation: msaWelcomeFadeIn 0.45s ease-out;
+}
+
+.msa-welcome-glow {
+    position: absolute;
+    width: 280px;
+    height: 280px;
+    border-radius: 50%;
+    background: rgba(70, 130, 255, 0.16);
+    filter: blur(70px);
+    animation: msaWelcomeGlow 2.2s ease-in-out infinite alternate;
+}
+
+.msa-welcome-card {
+    position: relative;
+    z-index: 2;
+    width: min(92%, 430px);
+    padding: 34px 24px 30px;
+    border-radius: 24px;
+    text-align: center;
+    box-sizing: border-box;
+
+    background:
+        linear-gradient(
+            145deg,
+            rgba(255,255,255,0.13),
+            rgba(255,255,255,0.055)
+        );
+
+    border: 1px solid rgba(255,255,255,0.16);
+
+    box-shadow:
+        0 24px 70px rgba(0,0,0,0.30),
+        inset 0 1px 0 rgba(255,255,255,0.08);
+
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+
+    animation: msaWelcomeCardIn 0.7s cubic-bezier(.2,.8,.2,1);
+}
+
+.msa-welcome-logo-wrap {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 18px;
+}
+
+.msa-welcome-logo {
+    width: 82px;
+    height: 82px;
+    object-fit: contain;
+    border-radius: 18px;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.22);
+}
+
+.msa-welcome-line {
+    width: 52px;
+    height: 3px;
+    margin: 0 auto 22px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.72);
+}
+
+.msa-welcome-heading {
+    font-size: clamp(25px, 7vw, 36px);
+    line-height: 1.12;
+    font-weight: 900;
+    letter-spacing: 0.02em;
+    color: #ffffff;
+    text-transform: uppercase;
+    animation: msaWelcomeTextIn 0.75s ease-out 0.15s both;
+}
+
+.msa-welcome-name {
+    margin-top: 13px;
+    font-size: clamp(20px, 5.5vw, 29px);
+    line-height: 1.2;
+    font-weight: 800;
+    color: #ffffff;
+    word-break: break-word;
+    animation: msaWelcomeTextIn 0.75s ease-out 0.28s both;
+}
+
+.msa-welcome-status {
+    margin-top: 22px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    color: rgba(255,255,255,0.62);
+    animation: msaWelcomeTextIn 0.75s ease-out 0.4s both;
+}
+
+.msa-welcome-loader {
+    width: 120px;
+    height: 3px;
+    margin: 14px auto 0;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.12);
+}
+
+.msa-welcome-loader span {
+    display: block;
+    width: 42%;
+    height: 100%;
+    border-radius: inherit;
+    background: rgba(255,255,255,0.82);
+    animation: msaWelcomeLoader 1.15s ease-in-out infinite;
+}
+
+@keyframes msaWelcomeFadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes msaWelcomeCardIn {
+    from {
+        opacity: 0;
+        transform: translateY(22px) scale(0.97);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes msaWelcomeTextIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes msaWelcomeGlow {
+    from {
+        transform: scale(0.92);
+        opacity: 0.55;
+    }
+
+    to {
+        transform: scale(1.12);
+        opacity: 0.95;
+    }
+}
+
+@keyframes msaWelcomeLoader {
+    0% {
+        transform: translateX(-130%);
+    }
+
+    50% {
+        transform: translateX(120%);
+    }
+
+    100% {
+        transform: translateX(260%);
+    }
+}
+
+@media (max-width: 480px) {
+
+    .msa-welcome-screen {
+        min-height: 68vh;
+        padding: 22px 14px;
+    }
+
+    .msa-welcome-card {
+        padding: 30px 18px 27px;
+        border-radius: 21px;
+    }
+
+    .msa-welcome-logo {
+        width: 72px;
+        height: 72px;
+    }
+
+}
+
+/* ============================================================
+   MSA PORTAL FINAL WELCOME OVERLAY
+   ============================================================ */
+
+.msa-welcome-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 999999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    box-sizing: border-box;
+    overflow: hidden;
+
+    background:
+        radial-gradient(
+            circle at center,
+            rgba(35, 82, 150, 0.38),
+            rgba(5, 18, 38, 0.97) 68%
+        );
+
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+
+    animation: msaWelcomeOverlayIn 0.45s ease-out;
+}
+
+.msa-welcome-overlay .msa-welcome-glow {
+    position: absolute;
+    width: 330px;
+    height: 330px;
+    border-radius: 50%;
+
+    background: rgba(70, 130, 255, 0.20);
+
+    filter: blur(75px);
+
+    animation:
+        msaWelcomeGlow 2.2s ease-in-out infinite alternate;
+}
+
+.msa-welcome-overlay .msa-welcome-card {
+    position: relative;
+    z-index: 2;
+
+    width: min(92vw, 430px);
+
+    padding: 36px 24px 30px;
+
+    border-radius: 24px;
+
+    text-align: center;
+
+    background:
+        linear-gradient(
+            145deg,
+            rgba(255,255,255,0.14),
+            rgba(255,255,255,0.055)
+        );
+
+    border: 1px solid rgba(255,255,255,0.18);
+
+    box-shadow:
+        0 28px 80px rgba(0,0,0,0.42),
+        inset 0 1px 0 rgba(255,255,255,0.10);
+
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+
+    animation:
+        msaWelcomeCardIn 0.7s cubic-bezier(.2,.8,.2,1);
+}
+
+.msa-welcome-overlay .msa-welcome-logo-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 18px;
+}
+
+.msa-welcome-overlay .msa-welcome-logo {
+    width: 84px;
+    height: 84px;
+
+    object-fit: contain;
+
+    border-radius: 18px;
+
+    box-shadow:
+        0 12px 32px rgba(0,0,0,0.28);
+}
+
+.msa-welcome-overlay .msa-welcome-line {
+    width: 54px;
+    height: 3px;
+
+    margin: 0 auto 22px;
+
+    border-radius: 999px;
+
+    background: rgba(255,255,255,0.78);
+}
+
+.msa-welcome-overlay .msa-welcome-heading {
+    font-size: clamp(25px, 7vw, 36px);
+
+    line-height: 1.12;
+
+    font-weight: 900;
+
+    letter-spacing: 0.02em;
+
+    color: #ffffff;
+
+    text-transform: uppercase;
+
+    animation:
+        msaWelcomeTextIn 0.75s ease-out 0.15s both;
+}
+
+.msa-welcome-overlay .msa-welcome-name {
+    margin-top: 13px;
+
+    font-size: clamp(20px, 5.5vw, 29px);
+
+    line-height: 1.2;
+
+    font-weight: 800;
+
+    color: #ffffff;
+
+    word-break: break-word;
+
+    animation:
+        msaWelcomeTextIn 0.75s ease-out 0.28s both;
+}
+
+.msa-welcome-overlay .msa-welcome-status {
+    margin-top: 22px;
+
+    font-size: 11px;
+
+    font-weight: 700;
+
+    letter-spacing: 0.16em;
+
+    color: rgba(255,255,255,0.62);
+
+    animation:
+        msaWelcomeTextIn 0.75s ease-out 0.40s both;
+}
+
+.msa-welcome-overlay .msa-welcome-loader {
+    width: 120px;
+    height: 3px;
+
+    margin: 14px auto 0;
+
+    overflow: hidden;
+
+    border-radius: 999px;
+
+    background: rgba(255,255,255,0.12);
+}
+
+.msa-welcome-overlay .msa-welcome-loader span {
+    display: block;
+
+    width: 42%;
+    height: 100%;
+
+    border-radius: inherit;
+
+    background: rgba(255,255,255,0.85);
+
+    animation:
+        msaWelcomeLoader 1.15s ease-in-out infinite;
+}
+
+.msa-welcome-overlay-hide {
+    animation:
+        msaWelcomeOverlayOut 0.35s ease-in forwards;
+}
+
+@keyframes msaWelcomeOverlayIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes msaWelcomeOverlayOut {
+    from {
+        opacity: 1;
+    }
+
+    to {
+        opacity: 0;
+    }
+}
+
+@media (max-width: 480px) {
+
+    .msa-welcome-overlay {
+        padding: 18px;
+    }
+
+    .msa-welcome-overlay .msa-welcome-card {
+        padding: 31px 18px 27px;
+        border-radius: 21px;
+    }
+
+    .msa-welcome-overlay .msa-welcome-logo {
+        width: 74px;
+        height: 74px;
+    }
+}
+
+/* MSA SCHOOL LOGO - fixed size, full image visible */
+.logo {
+    width: 92px;
+    height: 92px;
+    min-width: 92px;
+    min-height: 92px;
+    margin: 0 auto 20px;
+    padding: 8px;
+    border-radius: 24px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    background: #ffffff;
+    box-shadow: 0 12px 35px rgba(0, 150, 255, 0.3);
+}
+
+.logo img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: center;
+}
+
+/* MSA PORTAL - prevent welcome overlay logo zooming */
+.msa-welcome-overlay .msa-welcome-logo {
+    width: 84px;
+    height: 84px;
+    max-width: 84px;
+    max-height: 84px;
+    object-fit: contain;
+    object-position: center;
+    padding: 5px;
+    box-sizing: border-box;
+    background: #ffffff;
+    overflow: hidden;
+    border-radius: 18px;
+}
+
+@media (max-width: 480px) {
+    .msa-welcome-overlay .msa-welcome-logo {
+        width: 74px;
+        height: 74px;
+        max-width: 74px;
+        max-height: 74px;
+    }
+}

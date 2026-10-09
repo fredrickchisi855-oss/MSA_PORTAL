@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MSA PORTAL - Admin</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+            background: #07111f;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .portal {
+            width: 100%;
+            max-width: 430px;
+            background: #0d1b2e;
+            border: 1px solid #203553;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 50px rgba(0,0,0,.4);
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #91a4bd;
+            margin-top: 8px;
+        }
+
+        label {
+            display: block;
+            margin: 18px 0 8px;
+            color: #b8c7d9;
+            font-size: 14px;
+        }
+
+        input {
+            width: 100%;
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #29415f;
+            background: #081525;
+            color: white;
+            font-size: 16px;
+            outline: none;
+        }
+
+        input:focus {
+            border-color: #3b82f6;
+        }
+
+        button {
+            width: 100%;
+            border: 0;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            background: #2563eb;
+            color: white;
+        }
+
+        button:active {
+            transform: scale(.98);
+        }
+
+        .back-button {
+            background: #182940;
+        }
+
+        #loginMessage {
+            min-height: 22px;
+            text-align: center;
+            margin-top: 15px;
+            font-size: 14px;
+        }
+
+        .hint {
+            text-align: center;
+            color: #71849d;
+            font-size: 12px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="portal" id="loginPage">
+
+    <div class="logo">
+        <div class="logo-icon">🔐</div>
+        <h1>MSA PORTAL</h1>
+        <div class="subtitle">Admin Dashboard</div>
+    </div>
+
+    <label for="adminUsername">Username</label>
+    <div class="msa-admin-search-wrap">
+
+        <input
+            id="adminUsername"
+            type="text"
+            placeholder="Enter admin username"
+            autocomplete="username"
+        >
+
+        <div
+            id="adminUsernameSuggestions"
+            class="msa-admin-search-results"
+            aria-hidden="true"
+        ></div>
+
+    </div>
+
+    <label for="adminPassword">Password</label>
+    <input
+        id="adminPassword"
+        type="password"
+        placeholder="Enter admin password"
+        autocomplete="current-password"
+    >
+
+    <button type="button" onclick="login()">
+        LOGIN TO ADMIN
+    </button>
+
+    <div id="loginMessage"></div>
+
+    <button type="button" class="back-button" onclick="goBack()">
+        ← BACK TO PORTAL
+    </button>
+
+    <div class="hint">
+        Administrator access only
+    </div>
+
+</div>
+
+<script src="admin.js?v=USERNAMESEARCH1"></script>
+
+
+
+
+</body>
+</html>
