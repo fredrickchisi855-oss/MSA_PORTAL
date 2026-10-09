@@ -1,4 +1,7 @@
 import sqlite3
+import os
+import hashlib
+import secrets
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -14,6 +17,22 @@ def get_connection():
 def initialize_database():
     conn = get_connection()
     cursor = conn.cursor()
+
+    # Admin accounts used by the MSA PORTAL admin login.
+    # Create only if missing; never overwrite existing admin accounts.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS admin_users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            display_name TEXT NOT NULL,
+            role TEXT NOT NULL DEFAULT 'admin',
+            password_hash TEXT NOT NULL,
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            last_login_at TEXT
+        )
+    """)
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS students (
@@ -131,6 +150,69 @@ def initialize_database():
             FOREIGN KEY (student_id) REFERENCES students(id)
         )
     """)
+
+
+    # Student login protection.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS student_login_security (
+            student_id INTEGER PRIMARY KEY,
+            failed_attempts INTEGER NOT NULL DEFAULT 0,
+            blocked INTEGER NOT NULL DEFAULT 0,
+            blocked_at TEXT,
+            last_failed_at TEXT,
+            FOREIGN KEY (student_id) REFERENCES students(id)
+        )
+    """)
+
+    # Password-reset verification audit records.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS password_reset_attempts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id INTEGER,
+            student_name TEXT,
+            student_id_code TEXT,
+            form INTEGER,
+            entered_student_id TEXT,
+            result TEXT NOT NULL,
+            reason TEXT,
+            request_id INTEGER,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+
+    # Secure first-administrator setup.
+    # Configure these variables privately on Render.
+    admin_username = os.environ.get("MSA_ADMIN_USERNAME", "").strip()
+    admin_password = os.environ.get("MSA_ADMIN_PASSWORD", "")
+
+    admin_count = conn.execute(
+        "SELECT COUNT(*) FROM admin_users"
+    ).fetchone()[0]
+
+    if admin_count == 0 and admin_username and admin_password:
+        if len(admin_password) < 12:
+            conn.close()
+            raise ValueError(
+                "MSA_ADMIN_PASSWORD must be at least 12 characters."
+            )
+
+        salt = secrets.token_bytes(16)
+        iterations = 200000
+        digest = hashlib.pbkdf2_hmac(
+            "sha256", admin_password.encode("utf-8"), salt, iterations
+        )
+        password_hash = (
+            f"pbkdf2_sha256${iterations}${salt.hex()}${digest.hex()}"
+        )
+
+        conn.execute("""
+            INSERT INTO admin_users
+                (username, display_name, role, password_hash, active)
+            VALUES (?, ?, 'admin', ?, 1)
+        """, (admin_username, admin_username, password_hash))
+
+        print("✓ Initial administrator account created from environment.")
 
     conn.commit()
     conn.close()
