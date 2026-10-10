@@ -4768,6 +4768,9 @@ async function msaLoadAdminAnnouncements() {
             throw new Error(data.message || "Could not load announcements.");
         }
 
+        // Keep announcement values out of inline JavaScript arguments.
+        window.msaAnnouncementsCache = data.announcements;
+
         if (!data.announcements.length) {
             target.innerHTML = "<p>No announcements have been created yet.</p>";
             return;
@@ -4786,7 +4789,7 @@ async function msaLoadAdminAnnouncements() {
                         <small>${typeLabel} · ${Number(item.active) === 1 ? "Active" : "Disabled"}</small>
                         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
                             <button type="button" class="secondary-button"
-                                onclick="msaEditAnnouncement(${Number(item.id)}, '${msaAnnouncementEscape(item.announcement_type)}', '${msaAnnouncementEscape(item.title).replace(/'/g, '&#39;')}', '${msaAnnouncementEscape(item.message).replace(/'/g, '&#39;').replace(/\n/g, '\\n')}')">
+                                onclick="msaEditAnnouncementById(${Number(item.id)})">
                                 EDIT
                             </button>
                             ${Number(item.active) === 1 ? `
@@ -4802,6 +4805,24 @@ async function msaLoadAdminAnnouncements() {
     } catch (error) {
         target.textContent = error.message || "Unable to load announcements.";
     }
+}
+
+function msaEditAnnouncementById(id) {
+    const item = (window.msaAnnouncementsCache || []).find(function (entry) {
+        return Number(entry.id) === Number(id);
+    });
+
+    if (!item) {
+        alert("Could not find that announcement. Please reload the list.");
+        return;
+    }
+
+    msaEditAnnouncement(
+        item.id,
+        item.announcement_type,
+        item.title,
+        item.message
+    );
 }
 
 function msaEditAnnouncement(id, type, title, message) {
