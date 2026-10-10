@@ -181,6 +181,25 @@ def initialize_database():
     """)
 
 
+
+    # Public announcements contain messages only, never student results.
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS announcements (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            announcement_type TEXT NOT NULL
+                CHECK (announcement_type IN (
+                    'results_coming_soon',
+                    'results_are_out'
+                )),
+            title TEXT NOT NULL,
+            message TEXT NOT NULL,
+            active INTEGER NOT NULL DEFAULT 1,
+            created_by TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     # Secure first-administrator setup.
     # Configure these variables privately on Render.
     admin_username = os.environ.get("MSA_ADMIN_USERNAME", "").strip()

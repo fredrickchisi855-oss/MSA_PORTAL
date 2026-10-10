@@ -262,6 +262,61 @@ class MSAHandler(BaseHTTPRequestHandler):
 
         parsed = urlparse(self.path)
         path = parsed.path
+
+        # PUBLIC ANNOUNCEMENTS: messages only, no student information.
+        if path == "/api/announcements":
+            conn = get_connection()
+            try:
+                rows = conn.execute("""
+                    SELECT id, announcement_type, title, message,
+                           created_at, updated_at
+                    FROM announcements
+                    WHERE active = 1
+                    ORDER BY updated_at DESC, id DESC
+                """).fetchall()
+
+                send_json(self, {
+                    "ok": True,
+                    "announcements": [dict(row) for row in rows]
+                })
+            except Exception as error:
+                print("PUBLIC ANNOUNCEMENTS ERROR:", error)
+                send_json(self, {
+                    "ok": False,
+                    "message": "Unable to load announcements."
+                }, 500)
+            finally:
+                conn.close()
+            return
+
+        # ADMIN ANNOUNCEMENTS: authenticated administrators only.
+        if path == "/api/admin/announcements":
+            if not require_admin(self):
+                return
+
+            conn = get_connection()
+            try:
+                rows = conn.execute("""
+                    SELECT id, announcement_type, title, message, active,
+                           created_by, created_at, updated_at
+                    FROM announcements
+                    ORDER BY id DESC
+                """).fetchall()
+
+                send_json(self, {
+                    "ok": True,
+                    "announcements": [dict(row) for row in rows]
+                })
+            except Exception as error:
+                print("ADMIN ANNOUNCEMENTS LIST ERROR:", error)
+                send_json(self, {
+                    "ok": False,
+                    "message": "Unable to load announcements."
+                }, 500)
+            finally:
+                conn.close()
+            return
+
         query = parse_qs(parsed.query)
 
         # ---------------------------------------------
@@ -1844,6 +1899,153 @@ class MSAHandler(BaseHTTPRequestHandler):
 
         # ---------------------------------------------
         # ---------------------------------------------
+
+        # CREATE, EDIT, OR DISABLE AN ANNOUNCEMENT.
+        if path == "/api/admin/announcements":
+            if not require_admin(self):
+                return
+
+            action = str(data.get("action", "create")).strip().lower()
+            conn = get_connection()
+
+            try:
+                if action == "disable":
+                    announcement_id = data.get("id")
+                    try:
+                        announcement_id = int(announcement_id)
+                    except (TypeError, ValueError):
+                        send_json(self, {
+                            "ok": False,
+                            "message": "A valid announcement ID is required."
+                        }, 400)
+                        return
+
+                    cursor = conn.execute("""
+                        UPDATE announcements
+                        SET active = 0, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                    """, (announcement_id,))
+                    conn.commit()
+
+                    if cursor.rowcount == 0:
+                        send_json(self, {
+                            "ok": False,
+                            "message": "Announcement not found."
+                        }, 404)
+                    else:
+                        send_json(self, {
+                            "ok": True,
+                            "message": "Announcement disabled."
+                        })
+                    return
+
+                announcement_type = str(
+                    data.get("announcement_type", "")
+                ).strip()
+                title = str(data.get("title", "")).strip()
+                message = str(data.get("message", "")).strip()
+
+                allowed_types = {
+                    "results_coming_soon",
+                    "results_are_out"
+                }
+
+                if announcement_type not in allowed_types:
+                    send_json(self, {
+                        "ok": False,
+                        "message": "Choose a valid announcement type."
+                    }, 400)
+                    return
+
+                if not title or len(title) > 120:
+                    send_json(self, {
+                        "ok": False,
+                        "message": "Title is required and must be 120 characters or fewer."
+                    }, 400)
+                    return
+
+                if not message or len(message) > 2000:
+                    send_json(self, {
+                        "ok": False,
+                        "message": "Message is required and must be 2000 characters or fewer."
+                    }, 400)
+                    return
+
+                if action == "edit":
+                    try:
+                        announcement_id = int(data.get("id"))
+                    except (TypeError, ValueError):
+                        send_json(self, {
+                            "ok": False,
+                            "message": "A valid announcement ID is required."
+                        }, 400)
+                        return
+
+                    cursor = conn.execute("""
+                        UPDATE announcements
+                        SET announcement_type = ?, title = ?, message = ?,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                    """, (
+                        announcement_type, title, message, announcement_id
+                    ))
+
+                    if cursor.rowcount == 0:
+                        conn.rollback()
+                        send_json(self, {
+                            "ok": False,
+                            "message": "Announcement not found."
+                        }, 404)
+                        return
+
+                    conn.commit()
+                    send_json(self, {
+                        "ok": True,
+                        "message": "Announcement updated."
+                    })
+                    return
+
+                if action != "create":
+                    send_json(self, {
+                        "ok": False,
+                        "message": "Unsupported announcement action."
+                    }, 400)
+                    return
+
+                session = get_admin_session(self)
+                created_by = (
+                    str(session.get("username", "administrator"))
+                    if session else "administrator"
+                )
+
+                cursor = conn.execute("""
+                    INSERT INTO announcements
+                        (announcement_type, title, message, active, created_by)
+                    VALUES (?, ?, ?, 1, ?)
+                """, (
+                    announcement_type, title, message, created_by
+                ))
+
+                announcement_id = cursor.lastrowid
+                conn.commit()
+
+                send_json(self, {
+                    "ok": True,
+                    "message": "Announcement published.",
+                    "id": announcement_id
+                }, 201)
+
+            except Exception as error:
+                conn.rollback()
+                print("ADMIN ANNOUNCEMENT SAVE ERROR:", error)
+                send_json(self, {
+                    "ok": False,
+                    "message": "Unable to save announcement."
+                }, 500)
+            finally:
+                conn.close()
+            return
+
         # CLEAR PASSWORD RESET CENTRE RECORDS ONLY
         if path == "/api/admin/password-reset-requests/clear-all":
             if not require_admin(self):
@@ -2429,6 +2631,118 @@ class MSAHandler(BaseHTTPRequestHandler):
 
 
         # ---------------------------------------------
+
+        # UNPUBLISH ALL RESULTS; KEEP RECORDS AND PDF FILES
+        if path == "/api/results/unpublish-all":
+            if not require_admin(self):
+                return
+            conn = get_connection()
+            try:
+                cur = conn.execute(
+                    "UPDATE results SET published = 0, updated_at = CURRENT_TIMESTAMP WHERE published = 1"
+                )
+                count = cur.rowcount
+                conn.commit()
+                conn.close()
+                send_json(self, {
+                    "ok": True,
+                    "message": "All results unpublished. Records and PDFs were kept.",
+                    "unpublished_count": count
+                })
+            except Exception as error:
+                conn.rollback()
+                conn.close()
+                print("Unpublish all error:", error)
+                send_json(self, {"ok": False, "message": "Could not unpublish all results."}, 500)
+            return
+
+        # UNPUBLISH ONE RESULT; KEEP ITS RECORD AND PDF
+        if path.startswith("/api/results/") and path.endswith("/unpublish"):
+            if not require_admin(self):
+                return
+            try:
+                result_id = int(path.strip("/").split("/")[-2])
+                if result_id < 1:
+                    raise ValueError()
+            except (ValueError, IndexError):
+                send_json(self, {"ok": False, "message": "Invalid result ID."}, 400)
+                return
+            conn = get_connection()
+            try:
+                row = conn.execute("SELECT id FROM results WHERE id = ?", (result_id,)).fetchone()
+                if not row:
+                    conn.close()
+                    send_json(self, {"ok": False, "message": "Result not found."}, 404)
+                    return
+                conn.execute(
+                    "UPDATE results SET published = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (result_id,)
+                )
+                conn.commit()
+                conn.close()
+                send_json(self, {
+                    "ok": True,
+                    "message": "Result unpublished. Record and PDF were kept.",
+                    "result_id": result_id
+                })
+            except Exception as error:
+                conn.rollback()
+                conn.close()
+                print("Unpublish result error:", error)
+                send_json(self, {"ok": False, "message": "Could not unpublish result."}, 500)
+            return
+
+        # DELETE ONE RESULT AND ITS PDF
+        if path.startswith("/api/results/") and path.endswith("/delete"):
+            if not require_admin(self):
+                return
+            try:
+                result_id = int(path.strip("/").split("/")[-2])
+                if result_id < 1:
+                    raise ValueError()
+            except (ValueError, IndexError):
+                send_json(self, {"ok": False, "message": "Invalid result ID."}, 400)
+                return
+
+            conn = get_connection()
+            try:
+                row = conn.execute(
+                    "SELECT file_path FROM results WHERE id = ?", (result_id,)
+                ).fetchone()
+                if not row:
+                    conn.close()
+                    send_json(self, {"ok": False, "message": "Result not found."}, 404)
+                    return
+                file_path = row["file_path"]
+                conn.execute("DELETE FROM results WHERE id = ?", (result_id,))
+                conn.commit()
+                conn.close()
+            except Exception as error:
+                conn.rollback()
+                conn.close()
+                print("Delete result error:", error)
+                send_json(self, {"ok": False, "message": "Could not delete result."}, 500)
+                return
+
+            removed = False
+            if file_path:
+                try:
+                    root = os.path.realpath(RESULTS_DIR)
+                    target = os.path.realpath(file_path)
+                    if os.path.commonpath([root, target]) == root and os.path.isfile(target):
+                        os.remove(target)
+                        removed = True
+                except (OSError, ValueError) as error:
+                    print("PDF cleanup warning:", error)
+
+            send_json(self, {
+                "ok": True,
+                "message": "Selected result deleted.",
+                "result_id": result_id,
+                "file_removed": removed
+            })
+            return
+
         # PUBLISH RESULT
         # ---------------------------------------------
 
